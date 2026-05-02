@@ -1,40 +1,30 @@
 ---
-# OpenWebUI runs as a uv tool under the llm user (no container). uv fetches
-# Python {{ openwebui_python_version }} itself because Ubuntu 26.04 ships 3.13+
-# but open-webui pins <3.13.
-
 - name: Deploy OpenWebUI
   become_user: "{{ service_account }}"
   environment: "{{ user_systemd_env }}"
   vars:
     uv_bin: "{{ service_account_home }}/.local/bin/uv"
-    openwebui_bin: "{{ service_account_home }}/.local/bin/open-webui"
   block:
-    - name: Check for uv Binary
-      ansible.builtin.stat:
-        path: "{{ uv_bin }}"
-      register: uv_installed
-
     - name: Install uv via Astral Installer
       ansible.builtin.shell:
         cmd: set -o pipefail && curl -LsSf https://astral.sh/uv/install.sh | sh
         executable: /bin/bash
-      when: not uv_installed.stat.exists
-      changed_when: true
+        creates: "{{ uv_bin }}"
 
     - name: List Installed uv Tools
       ansible.builtin.command: "{{ uv_bin }} tool list"
       register: uv_tools
       changed_when: false
 
-    # `uv tool list` output format: "open-webui v<version>\n- open-webui"
-    - name: Install or Upgrade OpenWebUI to Pinned Version
+    # Trailing space prevents "0.9.2" from matching a future "0.9.20".
+    - name: Install OpenWebUI at Pinned Version
       ansible.builtin.command:
         cmd: >-
-          {{ uv_bin }} tool install --force
+          {{ uv_bin }} tool install
           --python {{ openwebui_python_version }}
+          --torch-backend rocm7.1
           open-webui=={{ openwebui_version }}
-      when: ('open-webui v' + openwebui_version) not in uv_tools.stdout
+      when: ('open-webui v' + openwebui_version + ' ') not in uv_tools.stdout
       notify: Restart openwebui
 
     - name: Ensure OpenWebUI Data Directory
