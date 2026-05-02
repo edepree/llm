@@ -1,0 +1,92 @@
+---
+service_account: llm
+service_account_home: "/home/{{ service_account }}"
+
+# Strix Halo unified memory + TTM
+# https://rocm.docs.amd.com/en/latest/how-to/system-optimization/strixhalo.html
+# 128 GiB = 33554432 pages at 4 KiB/page (128 * 1024 * 1024 / 4)
+ttm_pages_limit: 33554432
+
+# llama.cpp build pins. Router mode (PR#17859, Dec 2025) gives multi-model
+# serving natively — no llama-swap proxy needed.
+llamacpp_repo: https://github.com/ggml-org/llama.cpp.git
+llamacpp_git_rev: b9009
+llamacpp_src_dir: /opt/llama.cpp
+llamacpp_prefix: /usr/local
+
+# OpenAI-compatible endpoint exposed by llama-server (router mode).
+# Clients (OpenWebUI, coding agents) hit this; requests with `"model": "<name>"`
+# are routed to the matching preset section below.
+llamacpp_port: 8000
+
+# OpenWebUI runs as a uv-managed tool on the host (no container). uv fetches
+# the pinned interpreter (open-webui still requires 3.11) independently of the
+# system Python.
+openwebui_version: 0.9.2
+openwebui_python_version: "3.11"
+openwebui_port: 3000
+openwebui_data_dir: "{{ service_account_home }}/openwebui"
+
+openwebui_env:
+  OPENAI_API_BASE_URLS: "http://127.0.0.1:{{ llamacpp_port }}/v1"
+  OPENAI_API_KEYS: dummy
+  ENABLE_OPENAI_API: "true"
+  ENABLE_OLLAMA_API: "false"
+  WEBUI_AUTH: "false"
+  ENABLE_TITLE_GENERATION: "false"
+  ENABLE_FOLLOW_UP_GENERATION: "false"
+  ENABLE_TAGS_GENERATION: "false"
+  ENABLE_RETRIEVAL_QUERY_GENERATION: "false"
+  ENABLE_IMAGE_PROMPT_GENERATION: "false"
+  ENABLE_WEB_SEARCH: "false"
+  ENABLE_SEARCH_QUERY_GENERATION: "false"
+
+# Flags applied to every model (written as [*] in presets.ini).
+# n-gpu-layers = 999 offloads everything; flash-attn + jinja required for
+# correct Qwen chat templating and reasoning.
+llamacpp_common:
+  n-gpu-layers: 999
+  flash-attn: 1
+  jinja: 1
+
+# Model deployments. Each becomes a [section] in the presets.ini consumed
+# by llama-server --models-preset. The section name is what clients send
+# as "model" (aliases add more names).
+#
+# Per-entry:
+#   name          section name; also the primary "model" id
+#   hf            HF repo spec, "user/repo:quant-or-tag"
+#   ctx_size      context length
+#   enabled       include in the rendered ini
+#   aliases       optional comma-separated extra model ids
+#   sampling      dict of sampler overrides (temp, top-p, top-k, min-p, repeat-penalty)
+#   extra_args    dict of arbitrary extra preset keys passed through as-is
+#
+# Reasoning slot: Unsloth has not published 8-bit GGUFs for Qwen3.6; UD-Q4_K_XL
+# is their recommended quality tier. Enable thinking mode via chat-template-kwargs.
+# Coding slot: Q8_K_XL IS published, so using 8-bit per user preference.
+models:
+  - name: reasoning
+    hf: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_XL
+    ctx_size: 32768
+    enabled: true
+    aliases: qwen3.6,qwen3.6-35b
+    sampling:
+      temp: 1.0
+      top-p: 0.95
+      top-k: 20
+      min-p: 0.0
+    extra_args:
+      chat-template-kwargs: '{"enable_thinking":true}'
+
+  - name: coder
+    hf: unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:UD-Q8_K_XL
+    ctx_size: 65536
+    enabled: true
+    aliases: qwen3-coder,qwen-coder
+    sampling:
+      temp: 0.7
+      top-p: 0.8
+      top-k: 20
+      min-p: 0.0
+      repeat-penalty: 1.05

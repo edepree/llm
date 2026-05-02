@@ -1,0 +1,56 @@
+---
+- name: Deploy Local AI Stack on Strix Halo
+  hosts: all
+  become: true
+
+  vars_files:
+    - vars/main.yml
+
+  handlers:
+    - name: Restart Journald
+      ansible.builtin.systemd:
+        name: systemd-journald
+        state: restarted
+
+    - name: Update Grub
+      ansible.builtin.command: update-grub
+
+    - name: Run ldconfig
+      ansible.builtin.command: ldconfig
+
+    - name: Restart llamacpp
+      become_user: "{{ service_account }}"
+      environment: "{{ user_systemd_env }}"
+      ansible.builtin.systemd:
+        name: llamacpp.service
+        scope: user
+        daemon_reload: true
+        state: restarted
+
+    - name: Restart openwebui
+      become_user: "{{ service_account }}"
+      environment: "{{ user_systemd_env }}"
+      ansible.builtin.systemd:
+        name: openwebui.service
+        scope: user
+        daemon_reload: true
+        state: restarted
+
+  tasks:
+    - name: Host Hardening
+      ansible.builtin.import_tasks: tasks/hardening.yml
+
+    - name: Kernel and GPU Tuning
+      ansible.builtin.import_tasks: tasks/kernel.yml
+
+    - name: Install ROCm 7.1 from apt
+      ansible.builtin.import_tasks: tasks/rocm.yml
+
+    - name: Create Service Account
+      ansible.builtin.import_tasks: tasks/service-account.yml
+
+    - name: Build llama.cpp and Deploy Router Service
+      ansible.builtin.import_tasks: tasks/llamacpp.yml
+
+    - name: Deploy OpenWebUI
+      ansible.builtin.import_tasks: tasks/openwebui.yml

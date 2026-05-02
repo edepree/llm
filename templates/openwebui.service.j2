@@ -1,0 +1,18 @@
+[Unit]
+Description=Open WebUI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/open-webui serve --host 0.0.0.0 --port {{ openwebui_port }}
+Environment=DATA_DIR={{ openwebui_data_dir }}
+{% for k, v in openwebui_env.items() %}
+Environment={{ k }}={{ v }}
+{% endfor %}
+
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

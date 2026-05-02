@@ -1,0 +1,85 @@
+---
+- name: Install llama.cpp Build Dependencies
+  ansible.builtin.apt:
+    name:
+      - git
+      - cmake
+      - build-essential
+      - ccache
+      - libcurl4-openssl-dev
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Clone llama.cpp at Pinned Revision
+  ansible.builtin.git:
+    repo: "{{ llamacpp_repo }}"
+    dest: "{{ llamacpp_src_dir }}"
+    version: "{{ llamacpp_git_rev }}"
+  register: llamacpp_src
+
+- name: Check for Existing llama-server Binary
+  ansible.builtin.stat:
+    path: "{{ llamacpp_prefix }}/bin/llama-server"
+  register: llamacpp_bin
+
+# Rebuild when source changed OR binary missing (e.g., /usr/local wiped, first run).
+- name: Set Build-Required Fact
+  ansible.builtin.set_fact:
+    llamacpp_build_required: "{{ llamacpp_src.changed or not llamacpp_bin.stat.exists }}"
+
+- name: Configure, Build, and Install llama.cpp
+  when: llamacpp_build_required
+  environment:
+    PATH: "/opt/rocm/bin:{{ ansible_env.PATH }}"
+  block:
+    - name: Configure llama.cpp (cmake, HIP Backend)
+      ansible.builtin.command:
+        cmd: >-
+          cmake -S {{ llamacpp_src_dir }}
+                -B {{ llamacpp_src_dir }}/build
+                -DCMAKE_BUILD_TYPE=Release
+                -DCMAKE_INSTALL_PREFIX={{ llamacpp_prefix }}
+                -DGGML_HIP=ON
+                -DAMDGPU_TARGETS=gfx1151
+                -DCMAKE_HIP_COMPILER_ROCM_ROOT=/opt/rocm
+                -DCMAKE_C_COMPILER_LAUNCHER=ccache
+                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+                -DLLAMA_CURL=ON
+                -DLLAMA_BUILD_TESTS=OFF
+                -DLLAMA_BUILD_EXAMPLES=OFF
+
+    - name: Build llama.cpp
+      ansible.builtin.command:
+        cmd: cmake --build {{ llamacpp_src_dir }}/build --config Release -j
+
+    - name: Install llama.cpp Binaries
+      ansible.builtin.command:
+        cmd: cmake --install {{ llamacpp_src_dir }}/build
+      notify: Restart llamacpp
+
+- name: Deploy llama.cpp Router
+  become_user: "{{ service_account }}"
+  environment: "{{ user_systemd_env }}"
+  block:
+    - name: Template llama.cpp Router Presets
+      ansible.builtin.template:
+        src: llamacpp-presets.ini.j2
+        dest: "{{ service_account_home }}/.config/llamacpp/presets.ini"
+        mode: "0644"
+      notify: Restart llamacpp
+
+    - name: Template llama.cpp Router Systemd Unit
+      ansible.builtin.template:
+        src: llamacpp.service.j2
+        dest: "{{ service_account_home }}/.config/systemd/user/llamacpp.service"
+        mode: "0644"
+      notify: Restart llamacpp
+
+    - name: Enable llamacpp Service
+      ansible.builtin.systemd:
+        name: llamacpp.service
+        scope: user
+        daemon_reload: true
+        enabled: true
+        state: started
