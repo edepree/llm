@@ -7,16 +7,16 @@ if [[ -z "$host" ]]; then
   exit 1
 fi
 
+read -rp "Warm up the cache after setup? [y/N] " warm
+warm="${warm,,}"
+
 if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
-  uv run --no-lock ansible-playbook \
-    -i "${host}," \
-    --connection=local \
-    --ask-become-pass \
-    setup.yml
+  ansible_opts=(-i "${host}," --connection=local --ask-become-pass)
 else
-  uv run --no-lock ansible-playbook \
-    -i "${host}," \
-    --ask-pass \
-    --ask-become-pass \
-    setup.yml
+  ansible_opts=(-i "${host}," --ask-pass --ask-become-pass)
+fi
+
+uv run ansible-playbook "${ansible_opts[@]}" setup.yml
+if [[ "$warm" == "y" || "$warm" == "yes" ]]; then
+  uv run ansible-playbook "${ansible_opts[@]}" warm-cache.yml
 fi
