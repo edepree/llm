@@ -2,6 +2,7 @@
 - name: Install Host Hardening Packages
   ansible.builtin.apt:
     name:
+      - acl
       - ufw
       - unattended-upgrades
     state: present

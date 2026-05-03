@@ -7,12 +7,13 @@ Wants=network-online.target
 Type=simple
 # Router mode: no -m / -hf flag at the top level; children are spawned
 # per preset section. --models-max caps how many load concurrently.
-ExecStart={{ llamacpp_prefix }}/bin/llama-server \
+ExecStart={{ llamacpp_prefix }}/llama-server \
   --host 0.0.0.0 \
   --port {{ llamacpp_port }} \
   --models-preset %h/.config/llamacpp/presets.ini \
   --models-max {{ models | selectattr('enabled') | list | length }}
 
+Environment=LD_LIBRARY_PATH={{ llamacpp_prefix }}
 Environment=HSA_OVERRIDE_GFX_VERSION=11.5.1
 Environment=HIP_VISIBLE_DEVICES=0
 Environment=HF_XET_HIGH_PERFORMANCE=1

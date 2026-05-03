@@ -1,23 +1,25 @@
 ---
 - name: Deploy OpenWebUI
-  become_user: "{{ service_account }}"
   environment: "{{ user_systemd_env }}"
   vars:
     uv_bin: "{{ service_account_home }}/.local/bin/uv"
   block:
     - name: Install uv via Astral Installer
+      become_user: "{{ service_account }}"
       ansible.builtin.shell:
         cmd: set -o pipefail && curl -LsSf https://astral.sh/uv/install.sh | sh
         executable: /bin/bash
         creates: "{{ uv_bin }}"
 
     - name: List Installed uv Tools
+      become_user: "{{ service_account }}"
       ansible.builtin.command: "{{ uv_bin }} tool list"
       register: uv_tools
       changed_when: false
 
     # Trailing space prevents "0.9.2" from matching a future "0.9.20".
     - name: Install OpenWebUI at Pinned Version
+      become_user: "{{ service_account }}"
       ansible.builtin.command:
         cmd: >-
           {{ uv_bin }} tool install
@@ -25,22 +27,27 @@
           --torch-backend rocm7.1
           open-webui=={{ openwebui_version }}
       when: ('open-webui v' + openwebui_version + ' ') not in uv_tools.stdout
-      notify: Restart openwebui
+      notify: Restart Open WebUI
 
     - name: Ensure OpenWebUI Data Directory
       ansible.builtin.file:
         path: "{{ openwebui_data_dir }}"
         state: directory
+        owner: "{{ service_account }}"
+        group: "{{ service_account }}"
         mode: "0755"
 
     - name: Template OpenWebUI Systemd Unit
       ansible.builtin.template:
         src: openwebui.service.j2
         dest: "{{ service_account_home }}/.config/systemd/user/openwebui.service"
+        owner: "{{ service_account }}"
+        group: "{{ service_account }}"
         mode: "0644"
-      notify: Restart openwebui
+      notify: Restart Open WebUI
 
     - name: Enable OpenWebUI Service
+      become_user: "{{ service_account }}"
       ansible.builtin.systemd:
         name: openwebui.service
         scope: user

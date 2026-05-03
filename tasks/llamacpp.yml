@@ -1,7 +1,7 @@
 ---
 - name: Read Installed Version Stamp
   ansible.builtin.slurp:
-    src: /usr/local/share/llamacpp/version
+    src: "{{ llamacpp_prefix }}/version"
   register: llamacpp_stamp
   ignore_errors: true
 
@@ -12,16 +12,16 @@
 - name: Download and Install llamacpp-rocm Release
   when: llamacpp_install_required
   block:
+    - name: Install unzip
+      ansible.builtin.apt:
+        name: unzip
+        state: present
+
     - name: Ensure Staging Directory
       ansible.builtin.file:
         path: /tmp/llamacpp-rocm-staging
         state: directory
         mode: "0755"
-
-    - name: Install unzip
-      ansible.builtin.apt:
-        name: unzip
-        state: present
 
     - name: Download Release Archive
       ansible.builtin.get_url:
@@ -35,43 +35,32 @@
         dest: /tmp/llamacpp-rocm-staging
         remote_src: true
 
-    - name: Find llamacpp Binaries
-      ansible.builtin.find:
-        paths: /tmp/llamacpp-rocm-staging
-        patterns: "llama-*"
-        recurse: true
-        file_type: file
-      register: llamacpp_binaries
-
-    - name: Install llamacpp Binaries
-      ansible.builtin.copy:
-        src: "{{ item.path }}"
-        dest: "{{ llamacpp_prefix }}/bin/{{ item.path | basename }}"
-        mode: "0755"
-        remote_src: true
-      loop: "{{ llamacpp_binaries.files }}"
-      notify: Restart llamacpp
-
-    - name: Ensure Stamp Directory
+    - name: Ensure Install Directory
       ansible.builtin.file:
-        path: /usr/local/share/llamacpp
+        path: "{{ llamacpp_prefix }}"
         state: directory
         mode: "0755"
+
+    - name: Install llamacpp-rocm Release
+      ansible.builtin.command:
+        cmd: cp -a /tmp/llamacpp-rocm-staging/. {{ llamacpp_prefix }}/
+      notify: Restart llamacpp
 
     - name: Write Version Stamp
       ansible.builtin.copy:
         content: "{{ llamacpp_rocm_tag }}"
-        dest: /usr/local/share/llamacpp/version
+        dest: "{{ llamacpp_prefix }}/version"
         mode: "0644"
 
 - name: Deploy llama.cpp Router
-  become_user: "{{ service_account }}"
   environment: "{{ user_systemd_env }}"
   block:
     - name: Template llama.cpp Router Presets
       ansible.builtin.template:
         src: llamacpp-presets.ini.j2
         dest: "{{ service_account_home }}/.config/llamacpp/presets.ini"
+        owner: "{{ service_account }}"
+        group: "{{ service_account }}"
         mode: "0644"
       notify: Restart llamacpp
 
@@ -79,10 +68,13 @@
       ansible.builtin.template:
         src: llamacpp.service.j2
         dest: "{{ service_account_home }}/.config/systemd/user/llamacpp.service"
+        owner: "{{ service_account }}"
+        group: "{{ service_account }}"
         mode: "0644"
       notify: Restart llamacpp
 
     - name: Enable llamacpp Service
+      become_user: "{{ service_account }}"
       ansible.builtin.systemd:
         name: llamacpp.service
         scope: user
