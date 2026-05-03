@@ -31,6 +31,24 @@ Pre-downloads and loads all enabled models after provisioning. Blocks until comp
 uv run --no-lock ansible-playbook warm-cache.yml -i host.example.com,
 ```
 
+## Troubleshooting
+
+Services run as the `llm` user, so all logs are in the user journal. SSH into the target host first, then:
+
+```bash
+# llama.cpp router
+journalctl --user -u llamacpp.service -f
+
+# Open WebUI
+journalctl --user -u openwebui.service -f
+```
+
+Drop `-f` and add `-n 200` to read recent output without tailing. To query as root without switching users:
+
+```bash
+journalctl _UID=$(id -u llm) -u llamacpp.service -f
+```
+
 ## Design decisions
 
 **Pre-built llama.cpp** — uses [lemonade-sdk/llamacpp-rocm](https://github.com/lemonade-sdk/llamacpp-rocm) releases rather than compiling from source. Version-stamped at `{{ llamacpp_prefix }}/version`; bump `llamacpp_rocm_tag` in `vars/main.yml` to upgrade.
