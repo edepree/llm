@@ -49,6 +49,20 @@ Drop `-f` and add `-n 200` to read recent output without tailing. To query as ro
 journalctl _UID=$(id -u llm) -u llamacpp.service -f
 ```
 
+### Watching cache warmup
+
+Watch model files grow on disk as they download:
+
+```bash
+du -sh /home/llm/.cache/llama.cpp
+```
+
+Watch GPU/unified memory fill as models load:
+
+```bash
+rocm-smi --showmeminfo vram
+```
+
 ## Design decisions
 
 **Pre-built llama.cpp** — uses [lemonade-sdk/llamacpp-rocm](https://github.com/lemonade-sdk/llamacpp-rocm) releases rather than compiling from source. Version-stamped at `{{ llamacpp_prefix }}/version`; bump `llamacpp_rocm_tag` in `vars/main.yml` to upgrade.

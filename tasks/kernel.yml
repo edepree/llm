@@ -1,4 +1,11 @@
 ---
+- name: Install ROCm Tools
+  ansible.builtin.apt:
+    name:
+      - rocm-smi
+    state: present
+    update_cache: false
+
 - name: Set ttm Module Options (modprobe.d Fallback)
   ansible.builtin.copy:
     dest: /etc/modprobe.d/ttm.conf
