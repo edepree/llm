@@ -1,62 +1,68 @@
 ---
-- name: Install llama.cpp Build Dependencies
-  ansible.builtin.apt:
-    name:
-      - git
-      - cmake
-      - build-essential
-      - ccache
-      - libcurl4-openssl-dev
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
+- name: Read Installed Version Stamp
+  ansible.builtin.slurp:
+    src: /usr/local/share/llamacpp/version
+  register: llamacpp_stamp
+  ignore_errors: true
 
-- name: Clone llama.cpp at Pinned Revision
-  ansible.builtin.git:
-    repo: "{{ llamacpp_repo }}"
-    dest: "{{ llamacpp_src_dir }}"
-    version: "{{ llamacpp_git_rev }}"
-  register: llamacpp_src
-
-- name: Check for Existing llama-server Binary
-  ansible.builtin.stat:
-    path: "{{ llamacpp_prefix }}/bin/llama-server"
-  register: llamacpp_bin
-
-# Rebuild when source changed OR binary missing (e.g., /usr/local wiped, first run).
-- name: Set Build-Required Fact
+- name: Set Install-Required Fact
   ansible.builtin.set_fact:
-    llamacpp_build_required: "{{ llamacpp_src.changed or not llamacpp_bin.stat.exists }}"
+    llamacpp_install_required: "{{ llamacpp_stamp.failed or (llamacpp_stamp.content | b64decode | trim) != llamacpp_rocm_tag }}"
 
-- name: Configure, Build, and Install llama.cpp
-  when: llamacpp_build_required
-  environment:
-    PATH: "/opt/rocm/bin:{{ ansible_env.PATH }}"
+- name: Download and Install llamacpp-rocm Release
+  when: llamacpp_install_required
   block:
-    - name: Configure llama.cpp (cmake, HIP Backend)
-      ansible.builtin.command:
-        cmd: >-
-          cmake -S {{ llamacpp_src_dir }}
-                -B {{ llamacpp_src_dir }}/build
-                -DCMAKE_BUILD_TYPE=Release
-                -DCMAKE_INSTALL_PREFIX={{ llamacpp_prefix }}
-                -DGGML_HIP=ON
-                -DAMDGPU_TARGETS=gfx1151
-                -DCMAKE_HIP_COMPILER_ROCM_ROOT=/opt/rocm
-                -DCMAKE_C_COMPILER_LAUNCHER=ccache
-                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-                -DLLAMA_CURL=ON
-                -DLLAMA_BUILD_TESTS=OFF
-                -DLLAMA_BUILD_EXAMPLES=OFF
+    - name: Ensure Staging Directory
+      ansible.builtin.file:
+        path: /tmp/llamacpp-rocm-staging
+        state: directory
+        mode: "0755"
 
-    - name: Build llama.cpp
-      ansible.builtin.command:
-        cmd: cmake --build {{ llamacpp_src_dir }}/build --config Release -j
+    - name: Install unzip
+      ansible.builtin.apt:
+        name: unzip
+        state: present
 
-    - name: Install llama.cpp Binaries
-      ansible.builtin.command:
-        cmd: cmake --install {{ llamacpp_src_dir }}/build
+    - name: Download Release Archive
+      ansible.builtin.get_url:
+        url: "{{ llamacpp_rocm_url }}"
+        dest: /tmp/llamacpp-rocm.zip
+        mode: "0644"
+
+    - name: Extract Release Archive
+      ansible.builtin.unarchive:
+        src: /tmp/llamacpp-rocm.zip
+        dest: /tmp/llamacpp-rocm-staging
+        remote_src: true
+
+    - name: Find llamacpp Binaries
+      ansible.builtin.find:
+        paths: /tmp/llamacpp-rocm-staging
+        patterns: "llama-*"
+        recurse: true
+        file_type: file
+      register: llamacpp_binaries
+
+    - name: Install llamacpp Binaries
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ llamacpp_prefix }}/bin/{{ item.path | basename }}"
+        mode: "0755"
+        remote_src: true
+      loop: "{{ llamacpp_binaries.files }}"
       notify: Restart llamacpp
+
+    - name: Ensure Stamp Directory
+      ansible.builtin.file:
+        path: /usr/local/share/llamacpp
+        state: directory
+        mode: "0755"
+
+    - name: Write Version Stamp
+      ansible.builtin.copy:
+        content: "{{ llamacpp_rocm_tag }}"
+        dest: /usr/local/share/llamacpp/version
+        mode: "0644"
 
 - name: Deploy llama.cpp Router
   become_user: "{{ service_account }}"

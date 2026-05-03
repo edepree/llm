@@ -70,13 +70,23 @@
     enabled: true
     state: started
 
-- name: Cap Journald On-Disk Usage
-  ansible.builtin.copy:
-    dest: /etc/systemd/journald.conf.d/99-size-limits.conf
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      [Journal]
-      SystemMaxUse=1G
-  notify: Restart Journald
+# TODO FIX
+# [ERROR]: Task failed: Module failed: Destination directory /etc/systemd/journald.conf.d does not exist
+# Origin: /home/administrator/git/llm/tasks/hardening.yml:73:3
+
+# 71     state: started
+# 72
+# 73 - name: Cap Journald On-Disk Usage
+#      ^ column 3
+
+# fatal: [lisa.home.arpa]: FAILED! => {"changed": false, "checksum": "11d35406216331a232b028fbfd7541c150a7dcf4", "msg": "Destination directory /etc/systemd/journald.conf.d does not exist"}
+# - name: Cap Journald On-Disk Usage
+#   ansible.builtin.copy:
+#     dest: /etc/systemd/journald.conf.d/99-size-limits.conf
+#     owner: root
+#     group: root
+#     mode: "0644"
+#     content: |
+#       [Journal]
+#       SystemMaxUse=1G
+#   notify: Restart Journald

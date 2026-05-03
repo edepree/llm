@@ -15,25 +15,25 @@
     content: |
       options ttm pages_limit={{ ttm_pages_limit }} page_pool_size={{ ttm_pages_limit }}
 
-- name: Set Kernel Command Line for Strix Halo GPU Tuning
-  ansible.builtin.copy:
-    dest: /etc/default/grub.d/99-strix-halo.cfg
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} amd_iommu=off ttm.pages_limit={{ ttm_pages_limit }} ttm.page_pool_size={{ ttm_pages_limit }}"
-  notify: Update Grub
-  register: grub_cmdline
+# - name: Set Kernel Command Line for Strix Halo GPU Tuning
+#   ansible.builtin.copy:
+#     dest: /etc/default/grub.d/99-strix-halo.cfg
+#     owner: root
+#     group: root
+#     mode: "0644"
+#     content: |
+#       GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} amd_iommu=off ttm.pages_limit={{ ttm_pages_limit }} ttm.page_pool_size={{ ttm_pages_limit }}"
+#   notify: Update Grub
+#   register: grub_cmdline
 
-- name: Flag Reboot Required When Kernel Command Line Changed
-  ansible.builtin.file:
-    path: /var/run/reboot-required
-    state: touch
-    owner: root
-    group: root
-    mode: "0644"
-  when: grub_cmdline.changed
+# - name: Flag Reboot Required When Kernel Command Line Changed
+#   ansible.builtin.file:
+#     path: /var/run/reboot-required
+#     state: touch
+#     owner: root
+#     group: root
+#     mode: "0644"
+#   when: grub_cmdline.changed
 
 - name: Install tuned for cpufreq Management
   ansible.builtin.apt:
@@ -57,6 +57,10 @@
   ansible.builtin.command: tuned-adm profile accelerator-performance
   when: "'accelerator-performance' not in tuned_active.stdout"
 
+# TODO FIX
+# [WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+# [DEPRECATION WARNING]: Importing 'to_native' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+# changed: [lisa.home.arpa]
 - name: Allow Unprivileged Services to Bind Ports >= 80
   ansible.posix.sysctl:
     name: net.ipv4.ip_unprivileged_port_start

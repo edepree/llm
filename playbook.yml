@@ -1,6 +1,6 @@
 ---
 - name: Deploy Local AI Stack on Strix Halo
-  hosts: all
+  hosts: lisa.home.arpa
   become: true
 
   vars_files:
@@ -27,7 +27,7 @@
         daemon_reload: true
         state: restarted
 
-    - name: Restart openwebui
+    - name: Restart Open WebUI
       become_user: "{{ service_account }}"
       environment: "{{ user_systemd_env }}"
       ansible.builtin.systemd:
@@ -52,5 +52,5 @@
     - name: Build llama.cpp and Deploy Router Service
       ansible.builtin.import_tasks: tasks/llamacpp.yml
 
-    - name: Deploy OpenWebUI
+    - name: Deploy Open WebUI
       ansible.builtin.import_tasks: tasks/openwebui.yml
