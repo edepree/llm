@@ -1,6 +1,6 @@
 ---
 - name: Deploy Local AI Stack on Strix Halo
-  hosts: lisa.home.arpa
+  hosts: all
   become: true
 
   vars_files:
@@ -42,11 +42,6 @@
 
     - name: Kernel and GPU Tuning
       ansible.builtin.import_tasks: tasks/kernel.yml
-
-    # ROCm runtime libs are bundled in the lemonade-sdk llamacpp-rocm release;
-    # re-enable if system ROCm is needed for other workloads.
-    # - name: Install ROCm 7.1 from apt
-    #   ansible.builtin.import_tasks: tasks/rocm.yml
 
     - name: Create Service Account
       ansible.builtin.import_tasks: tasks/service-account.yml

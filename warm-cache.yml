@@ -3,7 +3,7 @@
 # Each model blocks until fully downloaded and loaded — expect hours for large GGUFs.
 # Run with: ansible-playbook warm-cache.yml
 - name: Warm llama.cpp Model Cache
-  hosts: lisa.home.arpa
+  hosts: all
   vars_files:
     - vars/main.yml
 
