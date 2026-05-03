@@ -56,6 +56,16 @@
         dest: "{{ llamacpp_prefix }}/version"
         mode: "0644"
 
+- name: Add llamacpp-rocm to Linker Search Path
+  ansible.builtin.copy:
+    dest: /etc/ld.so.conf.d/llamacpp-rocm.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {{ llamacpp_prefix }}
+  notify: Run ldconfig
+
 - name: Deploy llama.cpp Router
   environment: "{{ user_systemd_env }}"
   block:
