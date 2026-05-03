@@ -12,28 +12,11 @@
 - name: Download and Install llamacpp-rocm Release
   when: llamacpp_install_required
   block:
-    - name: Install unzip
-      ansible.builtin.apt:
-        name: unzip
-        state: present
-
-    - name: Ensure Staging Directory
-      ansible.builtin.file:
-        path: /tmp/llamacpp-rocm-staging
-        state: directory
-        mode: "0755"
-
     - name: Download Release Archive
       ansible.builtin.get_url:
         url: "{{ llamacpp_rocm_url }}"
         dest: /tmp/llamacpp-rocm.zip
         mode: "0644"
-
-    - name: Extract Release Archive
-      ansible.builtin.unarchive:
-        src: /tmp/llamacpp-rocm.zip
-        dest: /tmp/llamacpp-rocm-staging
-        remote_src: true
 
     - name: Ensure Install Directory
       ansible.builtin.file:
@@ -41,20 +24,28 @@
         state: directory
         mode: "0755"
 
-    - name: Install llamacpp-rocm Release
-      ansible.builtin.command:
-        cmd: cp -a /tmp/llamacpp-rocm-staging/. {{ llamacpp_prefix }}/
+    - name: Extract Release Archive
+      ansible.builtin.unarchive:
+        src: /tmp/llamacpp-rocm.zip
+        dest: "{{ llamacpp_prefix }}"
+        remote_src: true
 
     - name: Set Execute Bit on llamacpp Binaries
       ansible.builtin.command:
         cmd: find {{ llamacpp_prefix }} -maxdepth 1 -type f -name 'llama-*' -exec chmod 0755 {} +
-      notify: Restart llamacpp
+      changed_when: false
 
     - name: Write Version Stamp
       ansible.builtin.copy:
         content: "{{ llamacpp_rocm_tag }}"
         dest: "{{ llamacpp_prefix }}/version"
         mode: "0644"
+      notify: Restart llamacpp
+
+    - name: Remove Release Archive
+      ansible.builtin.file:
+        path: /tmp/llamacpp-rocm.zip
+        state: absent
 
 - name: Add llamacpp-rocm to Linker Search Path
   ansible.builtin.copy:
@@ -92,7 +83,6 @@
       ansible.builtin.systemd:
         name: llamacpp.service
         scope: user
-        daemon_reload: true
         enabled: true
         state: started
 

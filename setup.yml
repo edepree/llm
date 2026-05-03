@@ -12,9 +12,6 @@
         name: systemd-journald
         state: restarted
 
-    - name: Update Grub
-      ansible.builtin.command: update-grub
-
     - name: Run ldconfig
       ansible.builtin.command: ldconfig
 

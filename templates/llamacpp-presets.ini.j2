@@ -4,7 +4,7 @@ version = 1
 {% for k, v in llamacpp_common.items() -%}
 {{ k }} = {{ v }}
 {% endfor %}
-{% for m in models | selectattr('enabled') %}
+{% for m in models | selectattr('enabled') | list %}
 [{{ m.name }}]
 hf = {{ m.hf }}
 ctx-size = {{ m.ctx_size }}
