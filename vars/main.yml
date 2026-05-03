@@ -16,6 +16,7 @@ llamacpp_prefix: /opt/llamacpp-rocm
 # Clients send `"model": "<name>"`; llama-server routes to the matching preset.
 llamacpp_port: 8080
 
+
 # open-webui requires Python <3.13; uv fetches 3.11 independently of the system.
 openwebui_version: 0.9.2
 openwebui_python_version: "3.11"
@@ -72,7 +73,7 @@ models:
       top-k: 20
       min-p: 0.0
     extra_args:
-      chat-template-kwargs: '{"enable_thinking":true}'
+      reasoning: "on"
 
   - name: coder
     hf: unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:UD-Q8_K_XL
