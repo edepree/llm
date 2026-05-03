@@ -44,6 +44,10 @@
     - name: Install llamacpp-rocm Release
       ansible.builtin.command:
         cmd: cp -a /tmp/llamacpp-rocm-staging/. {{ llamacpp_prefix }}/
+
+    - name: Set Execute Bit on llamacpp Binaries
+      ansible.builtin.command:
+        cmd: find {{ llamacpp_prefix }} -maxdepth 1 -type f -name 'llama-*' -exec chmod 0755 {} +
       notify: Restart llamacpp
 
     - name: Write Version Stamp
