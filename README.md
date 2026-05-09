@@ -1,6 +1,6 @@
 # llm
 
-Ansible playbook that deploys a local AI stack on AMD Strix Halo (gfx1151). Runs two llama.cpp model servers routed by llama-swap, with Open WebUI as a frontend.
+Ansible playbook that deploys a local AI stack on AMD Strix Halo (gfx1151). Installs llama.cpp in multi-model router mode and Open WebUI as a frontend.
 
 ## Architecture
 
@@ -10,20 +10,15 @@ graph LR
 
     subgraph services["llm user services (systemd --user)"]
         webui["Open WebUI\n:80"]
-        swap["llama-swap\n:8080"]
-        reasoning["llamacpp-reasoning\n:8081"]
-        coder["llamacpp-coder\n:8082"]
+        router["llama.cpp router\n:8080"]
     end
 
-    webui -->|OpenAI API| swap
-    swap -->|model: reasoning| reasoning
-    swap -->|model: coder| coder
-
-    reasoning --- r_model["Qwen3.6-35B Q6\nctx 128K · reasoning on\nmmproj vision"]
-    coder --- c_model["Qwen3.6-35B Q6\nctx 64K · reasoning off"]
+    webui -->|OpenAI API| router
+    router -->|model: reasoning| r_model["Qwen3.6-35B Q6\nctx 128K · reasoning on"]
+    router -->|model: coder| c_model["Qwen3.6-35B Q6\nctx 64K · reasoning off"]
 ```
 
-Each llama.cpp instance runs one model, fully configured via CLI arguments. llama-swap routes requests to the correct backend based on the `model` field in the API request.
+A single `llama-server` instance handles all models via `--models-preset`. Clients address models by name (`"model": "reasoning"` or `"model": "coder"`); the server loads and routes to the matching preset.
 
 ## Requirements
 
@@ -65,12 +60,8 @@ sudo -u llm XDG_RUNTIME_DIR=/run/user/$(id -u llm) bash
 Then tail whichever service you need:
 
 ```bash
-# llama-swap router
-journalctl --user -u llamaswap.service -f
-
-# individual model servers
-journalctl --user -u llamacpp-reasoning.service -f
-journalctl --user -u llamacpp-coder.service -f
+# llama.cpp router
+journalctl --user -u llamacpp.service -f
 
 # Open WebUI
 journalctl --user -u openwebui.service -f
@@ -81,7 +72,7 @@ Drop `-f` and add `-n 200` to read recent output without tailing.
 Alternatively, query from any user by UID without switching:
 
 ```bash
-journalctl _UID=$(id -u llm) -u llamaswap.service -f
+journalctl _UID=$(id -u llm) -u llamacpp.service -f
 ```
 
 ### Watching cache warmup
@@ -102,13 +93,11 @@ rocm-smi --showmeminfo vram
 
 **Pre-built llama.cpp** — uses [lemonade-sdk/llamacpp-rocm](https://github.com/lemonade-sdk/llamacpp-rocm) releases rather than compiling from source. Version-stamped at `{{ llamacpp_prefix }}/version`; bump `llamacpp_rocm_tag` in `vars/main.yml` to upgrade.
 
-**llama-swap routing** — [mostlygeek/llama-swap](https://github.com/mostlygeek/llama-swap) proxies the public `:8080` endpoint to two dedicated llama.cpp servers. Each server runs one model with all parameters passed as CLI arguments; there is no preset INI file. Clients address models by name (`"model": "reasoning"` or `"model": "coder"`).
-
-**Two always-on model servers** — both llama.cpp instances stay loaded simultaneously. With 128 GiB unified memory and Q6 quantization (~26 GB per model), both fit alongside their KV caches without swapping.
+**Router mode** — a single `llama-server` instance handles all models via `--models-preset`. Clients address models by name (`"model": "reasoning"`); the server loads and routes to the matching preset. `--models-max` caps concurrent loads.
 
 **Service isolation** — services run as a dedicated `llm` user with lingering enabled, so they survive without a login session. All service management goes through `systemd --user`.
 
-**HSA_OVERRIDE_GFX_VERSION=11.5.1** — required because ROCm reports Strix Halo's iGPU as an unrecognized device; the override forces the gfx1151 codepath.
+**HSA_OVERRIDE_GFX_VERSION=11.5.1** — required because ROCm reports Strix Halo's iGPU as an unrecognized device; the override forces gfx1151 codepath.
 
 **Open WebUI via uv** — installed as a uv tool under the service account to keep its Python 3.11 dependency isolated from the system Python.
 

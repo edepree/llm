@@ -11,12 +11,6 @@ llamacpp_rocm_tag: b1258
 llamacpp_rocm_url: "https://github.com/lemonade-sdk/llamacpp-rocm/releases/download/{{ llamacpp_rocm_tag }}/llama-{{ llamacpp_rocm_tag }}-ubuntu-rocm-gfx1151-x64.zip"
 llamacpp_prefix: /opt/llamacpp-rocm
 
-# llama-swap router
-llamaswap_version: "211"
-llamaswap_url: "https://github.com/mostlygeek/llama-swap/releases/download/v{{ llamaswap_version }}/llama-swap_{{ llamaswap_version }}_linux_amd64.tar.gz"
-llamaswap_prefix: /opt/llamaswap
-
-# llama-swap listens here; individual llama.cpp servers listen on model.port
 llamacpp_port: 8080
 
 # Open WebUI
@@ -39,27 +33,23 @@ openwebui_env:
   ENABLE_WEB_SEARCH: "false"
   ENABLE_SEARCH_QUERY_GENERATION: "false"
 
-# Global llama.cpp key=value flags
+# Global llama.cpp flags (written as [*] in presets.ini)
 llamacpp_common:
   n-gpu-layers: 999
-  flash-attn: "on"     # accepts on/off/auto, not 1/0
+  flash-attn: 1
+  jinja: 1
   cache-type-k: q8_0
   cache-type-v: q8_0
-  defrag-thold: 0.1
+  # cont-batching: 1
+  # no-kv-offload: 1
+  # defrag-thold: 0.1
   threads: 32
   threads-batch: 32
-
-# Global llama.cpp boolean (presence-only) flags — no value argument
-llamacpp_flags:
-  - jinja          # Qwen template support
-  - cont-batching  # better throughput
-  - no-kv-offload  # keep tensors resident
-  - no-mmap        # disable memory-mapped I/O
-  - mlock          # pin model in RAM
+  mmap: 0
+  mlock: 1
 
 models:
   - name: reasoning
-    port: 8081
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
     # 262K is possible but wastes huge KV memory.
@@ -88,7 +78,6 @@ models:
       repeat-last-n: 4096
 
   - name: coder
-    port: 8082
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
     # Coding benefits less from giant contexts
@@ -110,7 +99,6 @@ models:
       repeat-penalty: 1.05
 
     extra_args:
-      # HUGE latency improvement for coding
       reasoning: "off"
 
       rope-scaling: yarn

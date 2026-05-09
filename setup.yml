@@ -19,17 +19,7 @@
       become_user: "{{ service_account }}"
       environment: "{{ user_systemd_env }}"
       ansible.builtin.systemd:
-        name: "llamacpp-{{ item.name }}.service"
-        scope: user
-        daemon_reload: true
-        state: restarted
-      loop: "{{ models | selectattr('enabled') | list }}"
-
-    - name: Restart llamaswap
-      become_user: "{{ service_account }}"
-      environment: "{{ user_systemd_env }}"
-      ansible.builtin.systemd:
-        name: llamaswap.service
+        name: llamacpp.service
         scope: user
         daemon_reload: true
         state: restarted
@@ -53,7 +43,7 @@
     - name: Create Service Account
       ansible.builtin.import_tasks: tasks/service-account.yml
 
-    - name: Install llama.cpp and llama-swap, Deploy Model Services
+    - name: Build llama.cpp and Deploy Router Service
       ansible.builtin.import_tasks: tasks/llamacpp.yml
 
     - name: Deploy Open WebUI

@@ -1,0 +1,20 @@
+version = 1
+
+[*]
+{% for k, v in llamacpp_common.items() -%}
+{{ k }} = {{ v }}
+{% endfor %}
+{% for m in models | selectattr('enabled') | list %}
+[{{ m.name }}]
+hf = {{ m['hf-repo'] }}
+ctx-size = {{ m.ctx_size }}
+{% if m.aliases is defined -%}
+alias = {{ m.aliases }}
+{% endif -%}
+{% for k, v in (m.sampling | default({})).items() -%}
+{{ k }} = {{ v }}
+{% endfor -%}
+{% for k, v in (m.extra_args | default({})).items() -%}
+{{ k }} = {{ v }}
+{% endfor %}
+{% endfor %}
