@@ -80,9 +80,6 @@ models:
     extra_args:
       reasoning: "on"
 
-      # Vision support
-      mmproj: unsloth/Qwen3.6-35B-A3B-GGUF/mmproj-F16.gguf
-
       # YaRN scaling for stable long context
       rope-scaling: yarn
       rope-scale: 4
