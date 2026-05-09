@@ -38,13 +38,13 @@ llamacpp_common:
   n-gpu-layers: 999
   flash-attn: 1
   jinja: 1
-  cache-type-k: q8_0
-  cache-type-v: q8_0
-  # cont-batching: 1
+  cache-type-k: q4_0
+  cache-type-v: q4_0
+  cont-batching: 1
   # no-kv-offload: 1
-  # defrag-thold: 0.1
+  defrag-thold: 0.1
   threads: 32
-  threads-batch: 32
+  threads-batch: 16
   mmap: 0
   mlock: 1
 
@@ -52,9 +52,10 @@ models:
   - name: claude/reasoning
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
-    ctx_size: 128000
+    ctx_size: 131072
 
     enabled: true
+    autoload: true
 
     aliases: thinking
 
@@ -78,11 +79,12 @@ models:
   - name: claude/coding
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
-    # Coding benefits less from giant contexts
-    # unless doing full repo ingestion.
-    ctx_size: 128000
+    # Coding rarely needs full context — 64k keeps TTFT low
+    # while still handling multi-file sessions.
+    ctx_size: 65536
 
     enabled: true
+    autoload: true
 
     aliases: coding
 

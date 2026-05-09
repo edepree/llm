@@ -8,6 +8,7 @@ version = 1
 [{{ m.name }}]
 hf = {{ m['hf-repo'] }}
 ctx-size = {{ m.ctx_size }}
+load-on-startup = {{ '1' if m.autoload | default(true) else '0' }}
 {% if m.aliases is defined -%}
 alias = {{ m.aliases }}
 {% endif -%}
