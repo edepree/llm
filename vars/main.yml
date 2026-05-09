@@ -52,7 +52,7 @@ models:
   - name: claude/reasoning
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
-    ctx_size: 131072
+    ctx_size: 262144
 
     enabled: true
     autoload: true
@@ -79,9 +79,7 @@ models:
   - name: claude/coding
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
-    # Coding rarely needs full context — 64k keeps TTFT low
-    # while still handling multi-file sessions.
-    ctx_size: 65536
+    ctx_size: 262144
 
     enabled: true
     autoload: true
