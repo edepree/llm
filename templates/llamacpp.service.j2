@@ -1,17 +1,11 @@
 [Unit]
-Description=llama.cpp router server (multi-model)
+Description=llama.cpp server ({{ model.name }})
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-# Router mode: no -m / -hf flag at the top level; children are spawned
-# per preset section. --models-max caps how many load concurrently.
-ExecStart={{ llamacpp_prefix }}/llama-server \
-  --host 0.0.0.0 \
-  --port {{ llamacpp_port }} \
-  --models-preset %h/.config/llamacpp/presets.ini \
-  --models-max {{ models | selectattr('enabled') | list | length }}
+ExecStart={{ llamacpp_prefix }}/llama-server --host 127.0.0.1 --port {{ model.port }} --hf-repo {{ model['hf-repo'] }} --ctx-size {{ model.ctx_size }}{% for k, v in llamacpp_common.items() %} --{{ k }} {{ v }}{% endfor %}{% for f in llamacpp_flags %} --{{ f }}{% endfor %}{% for k, v in (model.sampling | default({})).items() %} --{{ k }} {{ v }}{% endfor %}{% for k, v in (model.extra_args | default({})).items() %} --{{ k }} {{ v }}{% endfor %}
 
 Environment=LD_LIBRARY_PATH={{ llamacpp_prefix }}
 Environment=HSA_OVERRIDE_GFX_VERSION=11.5.1

@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-read -rp "Target endpoint (e.g. host.example.com): " host
-if [[ -z "$host" ]]; then
-  echo "Error: target endpoint is required" >&2
-  exit 1
-fi
-
-read -rp "Warm up the cache after setup? [y/N] " warm
-warm="${warm,,}"
+read -rp "Target endpoint (default: localhost): " host
+host="${host:-localhost}"
 
 if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
   ansible_opts=(-i "${host}," --connection=local --ask-become-pass)
@@ -17,6 +11,3 @@ else
 fi
 
 uv run ansible-playbook "${ansible_opts[@]}" setup.yml
-if [[ "$warm" == "y" || "$warm" == "yes" ]]; then
-  uv run ansible-playbook "${ansible_opts[@]}" warm-cache.yml
-fi

@@ -3,20 +3,23 @@ service_account: llm
 service_account_home: "/home/{{ service_account }}"
 
 # Strix Halo unified memory + TTM
-# https://rocm.docs.amd.com/en/latest/how-to/system-optimization/strixhalo.html
-# 128 GiB = 33554432 pages at 4 KiB/page (128 * 1024 * 1024 / 4)
+# 128 GiB = 33554432 pages at 4 KiB/page
 ttm_pages_limit: 33554432
 
-# llama.cpp release from lemonade-sdk/llamacpp-rocm (pre-built, gfx1151).
-# Bump llamacpp_rocm_tag to update; playbook is otherwise idempotent.
+# llama.cpp ROCm build
 llamacpp_rocm_tag: b1258
 llamacpp_rocm_url: "https://github.com/lemonade-sdk/llamacpp-rocm/releases/download/{{ llamacpp_rocm_tag }}/llama-{{ llamacpp_rocm_tag }}-ubuntu-rocm-gfx1151-x64.zip"
 llamacpp_prefix: /opt/llamacpp-rocm
 
-# Clients send `"model": "<name>"`; llama-server routes to the matching preset.
+# llama-swap router
+llamaswap_version: "211"
+llamaswap_url: "https://github.com/mostlygeek/llama-swap/releases/download/v{{ llamaswap_version }}/llama-swap_{{ llamaswap_version }}_linux_amd64.tar.gz"
+llamaswap_prefix: /opt/llamaswap
+
+# llama-swap listens here; individual llama.cpp servers listen on model.port
 llamacpp_port: 8080
 
-# open-webui requires Python <3.13; uv fetches 3.11 independently of the system.
+# Open WebUI
 openwebui_version: 0.9.2
 openwebui_python_version: "3.11"
 openwebui_port: 80
@@ -36,52 +39,84 @@ openwebui_env:
   ENABLE_WEB_SEARCH: "false"
   ENABLE_SEARCH_QUERY_GENERATION: "false"
 
-# Flags applied to every model (written as [*] in presets.ini).
-# n-gpu-layers = 999 offloads everything; flash-attn + jinja required for
-# correct Qwen chat templating and reasoning.
+# Global llama.cpp key=value flags
 llamacpp_common:
   n-gpu-layers: 999
-  flash-attn: 1
-  jinja: 1
+  flash-attn: "on"     # accepts on/off/auto, not 1/0
+  cache-type-k: q8_0
+  cache-type-v: q8_0
+  defrag-thold: 0.1
+  threads: 32
+  threads-batch: 32
 
-# Model deployments. Each becomes a [section] in the presets.ini consumed
-# by llama-server --models-preset. The section name is what clients send
-# as "model" (aliases add more names).
-#
-# Per-entry:
-#   name          section name; also the primary "model" id
-#   hf            HF repo spec, "user/repo:quant-or-tag"
-#   ctx_size      context length
-#   enabled       include in the rendered ini
-#   aliases       optional comma-separated extra model ids
-#   sampling      dict of sampler overrides (temp, top-p, top-k, min-p, repeat-penalty)
-#   extra_args    dict of arbitrary extra preset keys passed through as-is
-#
-# Reasoning slot: Unsloth has not published 8-bit GGUFs for Qwen3.6; UD-Q4_K_XL
-# is their recommended quality tier. Enable thinking mode via chat-template-kwargs.
-# Coding slot: Q8_K_XL IS published, so using 8-bit per user preference.
+# Global llama.cpp boolean (presence-only) flags — no value argument
+llamacpp_flags:
+  - jinja          # Qwen template support
+  - cont-batching  # better throughput
+  - no-kv-offload  # keep tensors resident
+  - no-mmap        # disable memory-mapped I/O
+  - mlock          # pin model in RAM
+
 models:
   - name: reasoning
-    hf: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_XL
-    ctx_size: 32768
+    port: 8081
+    hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
+
+    # 262K is possible but wastes huge KV memory.
+    # 128K is the practical sweet spot.
+    ctx_size: 131072
+
     enabled: true
-    aliases: qwen3.6,qwen3.6-35
+
+    aliases: qwen3.6,qwen-reasoning
+
     sampling:
       temp: 1.0
       top-p: 0.95
       top-k: 20
       min-p: 0.0
+      repeat-penalty: 1.02
+
     extra_args:
       reasoning: "on"
 
+      # Vision support
+      mmproj: unsloth/Qwen3.6-35B-A3B-GGUF/mmproj-F16.gguf
+
+      # YaRN scaling for stable long context
+      rope-scaling: yarn
+      rope-scale: 4
+
+      # Better reasoning stability
+      repeat-last-n: 4096
+
   - name: coder
-    hf: unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:UD-Q8_K_XL
+    port: 8082
+    hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
+
+    # Coding benefits less from giant contexts
+    # unless doing full repo ingestion.
     ctx_size: 65536
+
     enabled: true
-    aliases: qwen-coder
+
+    aliases: qwen-coder,qwen-dev
+
     sampling:
-      temp: 0.7
-      top-p: 0.8
+      # Lower temp for deterministic coding
+      temp: 0.2
+
+      top-p: 0.9
       top-k: 20
       min-p: 0.0
+
       repeat-penalty: 1.05
+
+    extra_args:
+      # HUGE latency improvement for coding
+      reasoning: "off"
+
+      rope-scaling: yarn
+      rope-scale: 2
+
+      repeat-last-n: 2048

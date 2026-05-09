@@ -57,32 +57,108 @@
       {{ llamacpp_prefix }}
   notify: Run ldconfig
 
-- name: Deploy llama.cpp Router
+- name: Read Installed llama-swap Version Stamp
+  ansible.builtin.slurp:
+    src: "{{ llamaswap_prefix }}/version"
+  register: llamaswap_stamp
+  ignore_errors: true
+
+- name: Set llama-swap Install-Required Fact
+  ansible.builtin.set_fact:
+    llamaswap_install_required: "{{ llamaswap_stamp.failed or (llamaswap_stamp.content | b64decode | trim) != llamaswap_version }}"
+
+- name: Download and Install llama-swap Release
+  when: llamaswap_install_required
+  block:
+    - name: Ensure llama-swap Install Directory
+      ansible.builtin.file:
+        path: "{{ llamaswap_prefix }}"
+        state: directory
+        mode: "0755"
+
+    - name: Download llama-swap Archive
+      ansible.builtin.get_url:
+        url: "{{ llamaswap_url }}"
+        dest: /tmp/llamaswap.tar.gz
+        mode: "0644"
+
+    - name: Extract llama-swap Archive
+      ansible.builtin.unarchive:
+        src: /tmp/llamaswap.tar.gz
+        dest: "{{ llamaswap_prefix }}"
+        remote_src: true
+
+    - name: Set Execute Bit on llama-swap Binary
+      ansible.builtin.file:
+        path: "{{ llamaswap_prefix }}/llama-swap"
+        mode: "0755"
+
+    - name: Write llama-swap Version Stamp
+      ansible.builtin.copy:
+        content: "{{ llamaswap_version }}"
+        dest: "{{ llamaswap_prefix }}/version"
+        mode: "0644"
+      notify: Restart llamaswap
+
+    - name: Remove llama-swap Archive
+      ansible.builtin.file:
+        path: /tmp/llamaswap.tar.gz
+        state: absent
+
+- name: Deploy llama.cpp Model Services
   environment: "{{ user_systemd_env }}"
   block:
-    - name: Template llama.cpp Router Presets
-      ansible.builtin.template:
-        src: llamacpp-presets.ini.j2
-        dest: "{{ service_account_home }}/.config/llamacpp/presets.ini"
+    - name: Ensure llamaswap Config Directory
+      ansible.builtin.file:
+        path: "{{ service_account_home }}/.config/llamaswap"
+        state: directory
         owner: "{{ service_account }}"
         group: "{{ service_account }}"
-        mode: "0644"
-      notify: Restart llamacpp
+        mode: "0755"
 
-    - name: Template llama.cpp Router Systemd Unit
+    - name: Template llama.cpp Model Systemd Units
       ansible.builtin.template:
         src: llamacpp.service.j2
-        dest: "{{ service_account_home }}/.config/systemd/user/llamacpp.service"
+        dest: "{{ service_account_home }}/.config/systemd/user/llamacpp-{{ item.name }}.service"
         owner: "{{ service_account }}"
         group: "{{ service_account }}"
         mode: "0644"
+      loop: "{{ models | selectattr('enabled') | list }}"
+      vars:
+        model: "{{ item }}"
       notify: Restart llamacpp
 
-    - name: Enable llamacpp Service
+    - name: Enable llamacpp Model Services
       become_user: "{{ service_account }}"
       ansible.builtin.systemd:
-        name: llamacpp.service
+        name: "llamacpp-{{ item.name }}.service"
         scope: user
         enabled: true
         state: started
+      loop: "{{ models | selectattr('enabled') | list }}"
 
+    - name: Template llama-swap Config
+      ansible.builtin.template:
+        src: llamaswap.yaml.j2
+        dest: "{{ service_account_home }}/.config/llamaswap/config.yaml"
+        owner: "{{ service_account }}"
+        group: "{{ service_account }}"
+        mode: "0644"
+      notify: Restart llamaswap
+
+    - name: Template llama-swap Systemd Unit
+      ansible.builtin.template:
+        src: llamaswap.service.j2
+        dest: "{{ service_account_home }}/.config/systemd/user/llamaswap.service"
+        owner: "{{ service_account }}"
+        group: "{{ service_account }}"
+        mode: "0644"
+      notify: Restart llamaswap
+
+    - name: Enable llamaswap Service
+      become_user: "{{ service_account }}"
+      ansible.builtin.systemd:
+        name: llamaswap.service
+        scope: user
+        enabled: true
+        state: started
