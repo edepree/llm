@@ -49,16 +49,14 @@ llamacpp_common:
   mlock: 1
 
 models:
-  - name: reasoning
+  - name: claude/reasoning
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
-    # 262K is possible but wastes huge KV memory.
-    # 128K is the practical sweet spot.
-    ctx_size: 131072
+    ctx_size: 128000
 
     enabled: true
 
-    aliases: qwen3.6,qwen-reasoning
+    aliases: thinking
 
     sampling:
       temp: 1.0
@@ -77,16 +75,16 @@ models:
       # Better reasoning stability
       repeat-last-n: 4096
 
-  - name: coder
+  - name: claude/coding
     hf-repo: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL
 
     # Coding benefits less from giant contexts
     # unless doing full repo ingestion.
-    ctx_size: 65536
+    ctx_size: 128000
 
     enabled: true
 
-    aliases: qwen-coder,qwen-dev
+    aliases: coding
 
     sampling:
       # Lower temp for deterministic coding
