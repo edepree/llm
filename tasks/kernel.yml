@@ -22,13 +22,14 @@
     state: started
 
 - name: Get Active tuned Profile
-  ansible.builtin.command: tuned-adm active
-  register: tuned_active
+  ansible.builtin.stat:
+    path: /etc/tuned/active_profile
+  register: tuned_active_link
   changed_when: false
 
 - name: Activate accelerator-performance tuned Profile
   ansible.builtin.command: tuned-adm profile accelerator-performance
-  when: "'accelerator-performance' not in tuned_active.stdout"
+  when: tuned_active_link.stat.islnk is defined and tuned_active_link.stat.lnk_target | basename != "accelerator-performance"
 
 - name: Allow Unprivileged Services to Bind Ports >= 80
   ansible.posix.sysctl:

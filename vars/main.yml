@@ -22,16 +22,7 @@ openwebui_data_dir: "{{ service_account_home }}/openwebui"
 openwebui_env:
   OPENAI_API_BASE_URLS: "http://127.0.0.1:{{ llamacpp_port }}/v1"
   OPENAI_API_KEYS: dummy
-  ENABLE_OPENAI_API: "true"
-  ENABLE_OLLAMA_API: "false"
   WEBUI_AUTH: "false"
-  ENABLE_TITLE_GENERATION: "false"
-  ENABLE_FOLLOW_UP_GENERATION: "false"
-  ENABLE_TAGS_GENERATION: "false"
-  ENABLE_RETRIEVAL_QUERY_GENERATION: "false"
-  ENABLE_IMAGE_PROMPT_GENERATION: "false"
-  ENABLE_WEB_SEARCH: "false"
-  ENABLE_SEARCH_QUERY_GENERATION: "false"
 
 # Global llama.cpp flags (written as [*] in presets.ini)
 llamacpp_common:

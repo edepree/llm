@@ -9,11 +9,9 @@ ExecStart={{ llamacpp_prefix }}/llama-server \
   --host 0.0.0.0 \
   --port {{ llamacpp_port }} \
   --models-preset %h/.config/llamacpp/presets.ini \
-  {% set enabled_models = models | selectattr('enabled') | list %}
-  {% set autoload_count = enabled_models | rejectattr('autoload', 'equalto', false) | list | length %}
-  {% if autoload_count > 0 %}--models-autoload \
-  {% else %}--no-models-autoload \
-  {% endif %}--models-max {{ enabled_models | length }}
+  --models-max {{ enabled_models | length }}
+  {% if models_with_autoload %}--models-autoload \
+  {% endif %}
 
 Environment=LD_LIBRARY_PATH={{ llamacpp_prefix }}
 Environment=HSA_OVERRIDE_GFX_VERSION=11.5.1

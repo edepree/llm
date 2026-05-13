@@ -10,15 +10,8 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
-
-- name: Upgrade All Packages
-  ansible.builtin.apt:
     autoclean: true
     autoremove: true
-    upgrade: safe
-  tags:
-    - upgrade
-    - never
 
 - name: Set ufw Default Deny Incoming
   community.general.ufw:

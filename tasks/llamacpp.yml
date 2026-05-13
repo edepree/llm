@@ -33,7 +33,6 @@
     - name: Set Execute Bit on llamacpp Binaries
       ansible.builtin.command:
         cmd: find {{ llamacpp_prefix }} -maxdepth 1 -type f -name 'llama-*' -exec chmod 0755 {} +
-      changed_when: false
 
     - name: Write Version Stamp
       ansible.builtin.copy:
@@ -57,6 +56,12 @@
       {{ llamacpp_prefix }}
   notify: Run ldconfig
 
+- name: Check if llama-swap service exists
+  ansible.builtin.stat:
+    path: "{{ service_account_home }}/.config/systemd/user/llamaswap.service"
+  register: llamaswap_service_exists
+  changed_when: false
+
 - name: Stop and Disable llama-swap Service
   become_user: "{{ service_account }}"
   environment: "{{ user_systemd_env }}"
@@ -66,14 +71,19 @@
     enabled: false
     state: stopped
   failed_when: false
+  when: llamaswap_service_exists.stat.exists | default(false)
 
 - name: Remove llama-swap Systemd Unit
   ansible.builtin.file:
     path: "{{ service_account_home }}/.config/systemd/user/llamaswap.service"
     state: absent
+  when: llamaswap_service_exists.stat.exists | default(false)
 
 - name: Deploy llama.cpp Router
   environment: "{{ user_systemd_env }}"
+  vars:
+    enabled_models: "{{ models | selectattr('enabled') | list }}"
+    models_with_autoload: "{{ enabled_models | rejectattr('autoload', 'equalto', false) | list }}"
   block:
     - name: Template llama.cpp Router Presets
       ansible.builtin.template:
@@ -98,5 +108,6 @@
       ansible.builtin.systemd:
         name: llamacpp.service
         scope: user
+        daemon_reload: true
         enabled: true
         state: started

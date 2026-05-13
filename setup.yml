@@ -21,7 +21,6 @@
       ansible.builtin.systemd:
         name: llamacpp.service
         scope: user
-        daemon_reload: true
         state: restarted
 
     - name: Restart Open WebUI
@@ -30,7 +29,6 @@
       ansible.builtin.systemd:
         name: openwebui.service
         scope: user
-        daemon_reload: true
         state: restarted
 
   tasks:

@@ -51,5 +51,6 @@
       ansible.builtin.systemd:
         name: openwebui.service
         scope: user
+        daemon_reload: true
         enabled: true
         state: started
