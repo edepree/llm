@@ -1,7 +1,0 @@
-#!/bin/bash
-set -euo pipefail
-
-command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
-
-uv sync
-uv run ansible-galaxy collection install -r requirements.yml
