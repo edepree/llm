@@ -6,22 +6,36 @@ service_account_home: "/home/{{ service_account }}"
 # GPU / ROCM
 ttm_pages_limit: 26214400 # 100 GB
 
-# PORTS
-openwebui_port: 80
-litellm_port: 4000
+litellm:
+  port: 4000
 
-models:
-  - name: qwen-36-reasoning
-    env:
-      LLAMA_ARG_CTX_SIZE: 262144
-      LLAMA_ARG_HF_REPO: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
-      LLAMA_ARG_N_GPU_LAYERS: 999
-      LLAMA_ARG_PORT: 8080
-      LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
-      LLAMA_ARG_SPEC_TYPE: draft-mtp
-      LLAMA_ARG_THREADS: 32
-    command:
-      temp: 1.0
-      top-p: 0.95
-      top-k: 20
-      min-p: 0.00
+openwebui:
+  port: 8080
+  environment_variables:
+    # OLLAMA_BASE_URL: http://host.containers.internal:8000
+    # ENABLE_OPENAI_API: false
+    WEBUI_AUTH: false
+    ENABLE_TITLE_GENERATION: false
+    ENABLE_FOLLOW_UP_GENERATION: false
+    ENABLE_TAGS_GENERATION: false
+    ENABLE_RETRIEVAL_QUERY_GENERATION: false
+    ENABLE_IMAGE_PROMPT_GENERATION: false
+    ENABLE_WEB_SEARCH: false
+    ENABLE_SEARCH_QUERY_GENERATION: false
+
+llamacpp:
+  models:
+    - name: qwen-36-reasoning
+      environment_variables:
+        LLAMA_ARG_CTX_SIZE: 262144
+        LLAMA_ARG_HF_REPO: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+        LLAMA_ARG_N_GPU_LAYERS: 999
+        LLAMA_ARG_PORT: 8080
+        LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
+        LLAMA_ARG_SPEC_TYPE: draft-mtp
+        LLAMA_ARG_THREADS: 32
+      command:
+        temp: 1.0
+        top-p: 0.95
+        top-k: 20
+        min-p: 0.00

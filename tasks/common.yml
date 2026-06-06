@@ -16,8 +16,8 @@
     proto: tcp
   loop:
     - "22"
-    - "{{ openwebui_port }}"
-    - "{{ litellm_port }}"
+    - "{{ openwebui.port }}"
+    - "{{ litellm.port }}"
 
 - name: Configure and Enable Firewall Defaults
   community.general.ufw:

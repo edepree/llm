@@ -5,15 +5,10 @@
     name: openwebui
     image: ghcr.io/open-webui/open-webui:latest
     publish:
-      - "8080:8080/tcp"
+      - "{{ openwebui.port }}:8080/tcp"
     volume:
       - "{{ service_account_home }}/.local/share/openwebui:/app/backend/data"
-    env:
-      OPENAI_API_BASE_URLS: "http://127.0.0.1:4000"
-      OPENAI_API_KEYS: dummy-key
-      WEBUI_AUTH: "false"
-      PORT: "8080"
-      HOST: 0.0.0.0
+    env: "{{ openwebui.environment_variables | default({}) }}"
     state: quadlet
 
 - name: Start OpenWebUI Systemd Unit

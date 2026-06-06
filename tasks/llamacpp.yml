@@ -1,6 +1,6 @@
 ---
 - name: Create llama.cpp Quadlet Container
-  loop: "{{ models }}"
+  loop: "{{ llamacpp.models }}"
   loop_control:
     loop_var: model
     label: "llamacpp-{{ model.name }}"
@@ -17,7 +17,7 @@
       - /dev/kfd
     group_add:
       - keep-groups
-    env: "{{ model.env | default({}) }}"
+    env: "{{ model.environment_variables | default({}) }}"
     state: quadlet
     command: >-
       {{
@@ -34,7 +34,7 @@
     enabled: true
     scope: user
     state: started
-  loop: "{{ models }}"
+  loop: "{{ llamacpp.models }}"
   loop_control:
     loop_var: model
     label: "{{ model.name }}"
