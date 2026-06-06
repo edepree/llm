@@ -1,5 +1,5 @@
 ---
-- name: Deploy LiteLLM config
+- name: Deploy LiteLLM Configuration
   ansible.builtin.template:
     src: templates/litellm-config.yaml.j2
     dest: "{{ service_account_home }}/.config/litellm/config.yaml"
@@ -7,11 +7,11 @@
     group: "{{ service_account }}"
     mode: "0644"
 
-- name: Deploy LiteLLM container via quadlet
+- name: Deploy LiteLLM Quadlet
   become_user: "{{ service_account }}"
   containers.podman.podman_container:
     name: litellm
-    image: "{{ litellm_image }}"
+    image: ghcr.io/berriai/litellm:main
     publish:
       - "4000:4000/tcp"
     volume:
@@ -21,12 +21,12 @@
       HOST: 0.0.0.0
       PORT: "4000"
     state: quadlet
-    force: true
-  notify: Reload systemd user daemon
 
 - name: Start LiteLLM Systemd Unit
+  become_user: "{{ service_account }}"
   ansible.builtin.systemd:
-    scope: user
     name: container-litellm.service
-    state: restarted
-  notify: Reload systemd user daemon
+    daemon_reload: true
+    enabled: true
+    scope: user
+    state: started

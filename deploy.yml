@@ -1,38 +1,22 @@
 ---
 - name: Deploy LLM Stack
-  hosts: all
+  hosts: localhost
   become: true
+  
   vars_files:
     - vars/main.yml
 
-  handlers:
-    - name: Restart journald
-      ansible.builtin.systemd:
-        name: systemd-journald
-        state: restarted
-
-    - name: Reload systemd
-      ansible.builtin.systemd:
-        daemon_reload: true
-
-    - name: Regenerate and start containers
-      block:
-        - name: Reload systemd user daemon
-          ansible.builtin.systemd:
-            scope: user
-            daemon_reload: true
-
   tasks:
-    - name: Import host provisioning
+    - name: Common Hosts Tasks
       ansible.builtin.import_tasks: tasks/common.yml
 
-    - name: Import service account creation
+    - name: Service Account Creation
       ansible.builtin.import_tasks: tasks/service-account.yml
 
-    - name: Import llama.cpp model downloads & container deployment
+    - name: Setup llama.cpp
       ansible.builtin.import_tasks: tasks/llamacpp.yml
 
-    - name: Import LiteLLM
+    - name: Setup LiteLLM
       ansible.builtin.import_tasks: tasks/litellm.yml
 
     - name: Import OpenWebUI

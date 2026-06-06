@@ -1,33 +1,4 @@
 ---
-# Build environment variables list per model (conditional keys need separate handling)
-- name: Set llamacpp environment variables per model
-  ansible.builtin.set_fact:
-    llamacpp_env:
-      base_env:
-        - "LLAMA_ARG_HOST=127.0.0.1"
-        - "LLAMA_ARG_PORT={{ model.llamacpp_port }}"
-        - "LLAMA_CACHE=/tmp/llama-cache"
-        - "HF_XET_HIGH_PERFORMANCE=true"
-        - "HSA_OVERRIDE_GFX_VERSION=12.1"
-        - "HIP_VISIBLE_DEVICES=0"
-      extra_env: []
-  loop: "{{ models }}"
-  loop_control:
-    loop_var: model
-    label: "{{ model.name }}"
-    pause: 0
-
-- name: Add HF_REPO to env for models that have one
-  ansible.builtin.set_fact:
-    llamacpp_env: "{{ llamacpp_env | combine({ 'extra_env': llamacpp_env.extra_env + ['LLAMA_ARG_HF_REPO=' + model.hf_repo | trim] }) }}"
-  loop: "{{ models }}"
-  loop_control:
-    loop_var: model
-    label: "{{ model.name }}"
-    pause: 0
-  when: model.hf_repo is defined and (model.hf_repo | default('', true) | string | trim | length) > 0
-
-# Deploy each model as a quadlet container using the podman module
 - name: Create llama.cpp Quadlet Container
   loop: "{{ models }}"
   loop_control:
@@ -36,39 +7,34 @@
   become_user: "{{ service_account }}"
   containers.podman.podman_container:
     name: "llamacpp-{{ model.name }}"
-    image: "{{ llamacpp_image }}"
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm
     publish:
-      - "{{ model.llamacpp_port }}:{{ model.llamacpp_port }}/tcp"
+      - "{{ model.port }}:{{ model.port }}/tcp"
+    volume:
+      - "llamacpp-{{ model.name }}:/root/.cache/llama.cpp"
     device:
       - /dev/dri
       - /dev/kfd
     group_add:
       - keep-groups
-    env:
-      - "LLAMA_ARG_HOST=127.0.0.1"
-      - "LLAMA_ARG_PORT={{ model.llamacpp_port }}"
-      - "LLAMA_CACHE=/tmp/llama-cache"
-      - "HF_XET_HIGH_PERFORMANCE=true"
-      - "HSA_OVERRIDE_GFX_VERSION=12.1"
-      - "HIP_VISIBLE_DEVICES=0"
-      {% if model.hf_repo is defined and (model.hf_repo | default('', true) | string | trim | length) > 0 %}
-      - "LLAMA_ARG_HF_REPO={{ model.hf_repo | trim }}"
-      {% endif %}
-      {% if model.hf_token is defined and (model.hf_token | default('', true) | string | trim | length) > 0 %}
-      - "HF_TOKEN={{ model.hf_token | trim }}"
-      {% endif %}
+    env: "{{ model.env | default({}) }}"
     state: quadlet
-    force: true
-    command: "./server --threads-batch {{ model.llamacpp_thread_batch_count | default(16) }} --gpu-layers {{ model.llamacpp_gpu_layers | default(999) }} --ctx-size {{ model.ctx_size }} --mlock {{ model.llamacpp_mlock | default(true) | lower }} --mmap false --defrag-thold {{ model.llamacpp_defrag_thold | default(0.1) }} --threads {{ model.llamacpp_thread_count }} --top-k {{ model.llamacpp_top_k | default(-1) }} --temp {{ model.temp | default(1.0) }} --top-p {{ model.top_p | default(0.95) }} --min-p {{ model.min_p | default(0.0) }} --flash-attn {{ model.llamacpp_flash_attn | default(false) | lower }} --cache-type-k {{ model.llamacpp_cache_type_k | default('f16') }} --cache-type-v {{ model.llamacpp_cache_type_v | default('f16') }} --batching {{ model.llamacpp_cont_batching | default(false) | lower }} --reasoning {{ model.llamacpp_reasoning | default('auto') }} --spec-type {{ model.llamacpp_spec_type | default('draft-mtp') }} --spec-draft-n-max {{ model.llamacpp_spec_draft_n_max | default(2) }}"
-  notify: Reload systemd user daemon
+    command: >-
+      {{
+        model.command
+        | dict2items
+        | map('community.general.json_query', '{k: key, v: value}')
+      }}
 
 - name: Start llama.cpp Systemd Units
+  become_user: "{{ service_account }}"
   ansible.builtin.systemd:
-    scope: user
     name: "container-llamacpp-{{ model.name }}.service"
-    state: restarted
+    daemon_reload: true
+    enabled: true
+    scope: user
+    state: started
   loop: "{{ models }}"
   loop_control:
     loop_var: model
     label: "{{ model.name }}"
-  notify: Reload systemd user daemon

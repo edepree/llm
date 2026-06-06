@@ -63,7 +63,7 @@
     enabled: true
     state: started
 
-- name: Ensure journald.conf.d directory
+- name: Ensure journald.conf.d Directory
   ansible.builtin.file:
     path: /etc/systemd/journald.conf.d
     state: directory
@@ -71,7 +71,7 @@
     group: root
     mode: "0755"
 
-- name: Cap journald on-disk usage
+- name: Limit journald On-Disk Usage
   ansible.builtin.copy:
     dest: /etc/systemd/journald.conf.d/99-size-limits.conf
     owner: root

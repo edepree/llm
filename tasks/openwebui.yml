@@ -1,9 +1,9 @@
 ---
-- name: Deploy OpenWebUI container via quadlet
+- name: Deploy OpenWebUI Quadlet
   become_user: "{{ service_account }}"
   containers.podman.podman_container:
     name: openwebui
-    image: "{{ openwebui_image }}"
+    image: ghcr.io/open-webui/open-webui:latest
     publish:
       - "8080:8080/tcp"
     volume:
@@ -15,12 +15,12 @@
       PORT: "8080"
       HOST: 0.0.0.0
     state: quadlet
-    force: true
-  notify: Reload systemd user daemon
 
 - name: Start OpenWebUI Systemd Unit
+  become_user: "{{ service_account }}"
   ansible.builtin.systemd:
-    scope: user
     name: container-openwebui.service
-    state: restarted
-  notify: Reload systemd user daemon
+    daemon_reload: true
+    enabled: true
+    scope: user
+    state: started
