@@ -1,18 +1,18 @@
 ---
 - name: Deploy OpenWebUI Quadlet
-  become_user: "{{ service_account }}"
+  become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: openwebui
     image: ghcr.io/open-webui/open-webui:latest
     publish:
       - "{{ openwebui.port }}:8080/tcp"
     volume:
-      - "{{ service_account_home }}/.local/share/openwebui:/app/backend/data"
+      - "openwebui:/app/backend/data"
     env: "{{ openwebui.environment_variables | default({}) }}"
     state: quadlet
 
 - name: Start OpenWebUI Systemd Unit
-  become_user: "{{ service_account }}"
+  become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
     name: container-openwebui.service
     daemon_reload: true

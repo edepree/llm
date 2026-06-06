@@ -1,10 +1,9 @@
 ---
-# SERVICE ACCOUNT
-service_account: llm
-service_account_home: "/home/{{ service_account }}"
-
 # GPU / ROCM
 ttm_pages_limit: 26214400 # 100 GB
+
+service_account:
+  name: llm
 
 litellm:
   port: 4000

@@ -2,20 +2,20 @@
 - name: Deploy LiteLLM Configuration
   ansible.builtin.template:
     src: templates/litellm-config.yaml.j2
-    dest: "{{ service_account_home }}/.config/litellm/config.yaml"
-    owner: "{{ service_account }}"
-    group: "{{ service_account }}"
+    dest: "/home/{{ service_account.name }}/.config/litellm/config.yaml"
+    owner: "{{ service_account.name }}"
+    group: "{{ service_account.name }}"
     mode: "0644"
 
 - name: Deploy LiteLLM Quadlet
-  become_user: "{{ service_account }}"
+  become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: litellm
     image: ghcr.io/berriai/litellm:main
     publish:
       - "{{ litellm.port }}:8080/tcp"
     volume:
-      - "{{ service_account_home }}/.config/litellm/config.yaml:/app/config.yaml:ro"
+      - "/home/{{ service_account.name }}/.config/litellm/config.yaml:/app/config.yaml:ro"
     env:
       LITELLM_LOG: WARNING
       HOST: 0.0.0.0
@@ -23,7 +23,7 @@
     state: quadlet
 
 - name: Start LiteLLM Systemd Unit
-  become_user: "{{ service_account }}"
+  become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
     name: container-litellm.service
     daemon_reload: true

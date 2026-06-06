@@ -4,7 +4,7 @@
   loop_control:
     loop_var: model
     label: "llamacpp-{{ model.name }}"
-  become_user: "{{ service_account }}"
+  become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: "llamacpp-{{ model.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
@@ -27,7 +27,7 @@
       }}
 
 - name: Start llama.cpp Systemd Units
-  become_user: "{{ service_account }}"
+  become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
     name: "container-llamacpp-{{ model.name }}.service"
     daemon_reload: true
