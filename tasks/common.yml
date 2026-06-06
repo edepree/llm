@@ -1,13 +1,17 @@
 ---
-- name: Update, Upgrade, and Install Packages
+- name: Update and Upgrade Operating System 
   ansible.builtin.apt:
-    name:
-      - podman
-      - ufw
     autoclean: true
     autoremove: true
     update_cache: true
     upgrade: safe
+
+- name: Install Packages
+  ansible.builtin.apt:
+    name:
+      - podman
+      - ufw
+    state: present
 
 - name: Configure Firewall Rules
   community.general.ufw:
