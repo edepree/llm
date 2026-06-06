@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+# user input
+read -rp "Target Endpoint (default: localhost): " host
+host="${host:-localhost}"
 
 # install uv (skip if already on PATH)
 if ! command -v uv &> /dev/null; then
@@ -6,10 +11,12 @@ if ! command -v uv &> /dev/null; then
   source $HOME/.local/bin/env
 fi
 
-# setup python and ansible environment
 uv sync
-uv run ansible-galaxy install -r requirements.yml
+uv run ansible-galaxy collection install -r requirements.yml
 
 # run playbook
-# read -rp "Domain [ntfy.example.com]: " DOMAIN
-# uv run ansible-playbook playbook.yml -i localhost, -e "domain=${DOMAIN:-ntfy.example.com}"
+if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
+  uv run ansible-playbook -i "${host}," --connection=local --ask-become-pass deploy.yml
+else
+  uv run ansible-playbook -i "${host}," --ask-pass --ask-become-pass deploy.yml
+fi

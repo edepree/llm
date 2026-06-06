@@ -1,0 +1,8 @@
+model_list:
+{% for model in models %}
+  - model_name: {{ model.name }}
+    litellm_params:
+      model: openai/{{ model.name }}
+      api_base: http://127.0.0.1:{{ model.llamacpp_port }}/v1
+      api_key: "dummy-key"
+{% endfor %}

@@ -1,0 +1,12 @@
+[Container]
+Image={{ litellm_image }}
+Name=litellm
+PublishPort={{ litellm_port }}:4000
+Volume={{ service_account_home }}/.config/litellm/config.yaml:/app/config.yaml:ro
+RestartPolicy=unless-stopped
+Env=LITELLM_LOG=WARNING
+Env=HOST=0.0.0.0
+Env=PORT=4000
+
+[Install]
+WantedBy=default.target

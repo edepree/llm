@@ -1,0 +1,26 @@
+---
+- name: Deploy OpenWebUI container via quadlet
+  become_user: "{{ service_account }}"
+  containers.podman.podman_container:
+    name: openwebui
+    image: "{{ openwebui_image }}"
+    publish:
+      - "8080:8080/tcp"
+    volume:
+      - "{{ service_account_home }}/.local/share/openwebui:/app/backend/data"
+    env:
+      OPENAI_API_BASE_URLS: "http://127.0.0.1:4000"
+      OPENAI_API_KEYS: dummy-key
+      WEBUI_AUTH: "false"
+      PORT: "8080"
+      HOST: 0.0.0.0
+    state: quadlet
+    force: true
+  notify: Reload systemd user daemon
+
+- name: Start OpenWebUI Systemd Unit
+  ansible.builtin.systemd:
+    scope: user
+    name: container-openwebui.service
+    state: restarted
+  notify: Reload systemd user daemon

@@ -1,0 +1,53 @@
+{% set env_lines = [] %}
+
+{% for k, v in model.items() %}
+{% if k.startswith('llamacpp_') %}
+{% set _ = env_lines.append('Env=LLAMA_ARG_' ~ k[11:] | upper ~ '=' ~ v | string | lower) %}
+{% endif %}
+{% endfor %}
+
+{% if model.hf_repo | default('', true) | string | trim | length > 0 %}
+{% set _ = env_lines.append('Env=LLAMA_ARG_HF_REPO=' ~ model.hf_repo | string | trim) %}
+{% endif %}
+{% if model.hf_token | default('', true) | string | trim | length > 0 %}
+{% set _ = env_lines.append('Env=HF_TOKEN=' ~ model.hf_token | string | trim) %}
+{% endif %}
+
+{% set _ = env_lines.append('Env=LLAMA_ARG_HOST=127.0.0.1') %}
+{% set _ = env_lines.append('Env=LLAMA_ARG_PORT=' ~ model.llamacpp_port | string) %}
+{% set _ = env_lines.append('Env=LLAMA_CACHE=/tmp/llama-cache') %}
+{% set _ = env_lines.append('Env=HF_XET_HIGH_PERFORMANCE=true') %}
+{% set _ = env_lines.append('Env=HSA_OVERRIDE_GFX_VERSION=12.1') %}
+{% set _ = env_lines.append('Env=HIP_VISIBLE_DEVICES=0') %}
+
+{% set base_cmd = './server --threads-batch ' ~ (model.llamacpp_thread_batch_count | default(16) | string) %}
+{% set cmd_args = [] %}
+{% if model.temp is defined and model.temp is not none %}
+{% set _ = cmd_args.append('--temp ' ~ model.temp | string) %}
+{% endif %}
+{% if model.top_p is defined and model.top_p is not none %}
+{% set _ = cmd_args.append('--top-p ' ~ model.top_p | string) %}
+{% endif %}
+{% if model.min_p is defined and model.min_p is not none %}
+{% set _ = cmd_args.append('--min-p ' ~ model.min_p | string) %}
+{% endif %}
+{% set extra = (model.llamacpp_extra_cli_args | default('', true) | string | trim) %}
+{% if extra | length > 0 %}
+{% set _ = cmd_args.append(extra) %}
+{% endif %}
+{% set full_cmd = base_cmd ~ ' ' ~ cmd_args | join(' ') | trim %}
+
+[Container]
+Image={{ llamacpp_image }}
+Name=llamacpp-{{ model.name }}
+PublishPort={{ model.llamacpp_port }}:{{ model.llamacpp_port }}
+Device=/dev/dri
+Device=/dev/kfd
+RestartPolicy=unless-stopped
+{% for line in env_lines %}
+{{ line }}
+{% endfor %}
+Command={{ full_cmd }}
+
+[Install]
+WantedBy=default.target

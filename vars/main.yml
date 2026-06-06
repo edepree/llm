@@ -1,0 +1,45 @@
+---
+# Service account
+service_account: llm
+service_account_home: "/home/{{ service_account }}"
+
+# GPU / ROCM
+ttm_pages_limit: 33554432  # 128 GiB = 33554432 pages at 4 KiB/page
+
+# Ports
+openwebui_port: 80
+litellm_port: 4000
+
+# Container images
+litellm_image: "ghcr.io/berriai/litellm:main"
+llamacpp_image: "ghcr.io/ggml-org/llama.cpp:server-rocm"
+openwebui_image: "ghcr.io/open-webui/open-webui:latest"
+
+# Models (one entry per model).
+# llamacpp_* fields go into container env vars with LLAMA_ARG_ prefix.
+# temp/top_p/min_p: passed via command (no env var in llama.cpp).
+# llamacpp_extra_cli_args: catch-all for additional CLI arguments.
+models:
+  - name: model-a
+    hf_repo: "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q4_K_XL"
+    hf_token: ""
+    ctx_size: 131072
+    llamacpp_port: 8080
+    llamacpp_gpu_layers: 999
+    llamacpp_thread_count: 32
+    llamacpp_thread_batch_count: 16
+    llamacpp_flash_attn: true
+    llamacpp_cache_type_k: q4_0
+    llamacpp_cache_type_v: q4_0
+    llamacpp_cont_batching: true
+    llamacpp_mmap: false
+    llamacpp_mlock: true
+    llamacpp_defrag_thold: 0.1
+    llamacpp_reasoning: "auto"
+    llamacpp_top_k: 20
+    llamacpp_spec_type: "draft-mtp"
+    llamacpp_spec_draft_n_max: 2
+    llamacpp_spec_draft_n_min: 0
+    temp: 1.0
+    top_p: 0.95
+    min_p: 0.00
