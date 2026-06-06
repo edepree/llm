@@ -1,4 +1,12 @@
 ---
+- name: Create LiteLLM Configuration Directory
+  ansible.builtin.file:
+    path: "/home/{{ service_account.name }}/.config/litellm"
+    state: directory
+    owner: "{{ service_account.name }}"
+    group: "{{ service_account.name }}"
+    mode: "0755"
+
 - name: Deploy LiteLLM Configuration
   ansible.builtin.template:
     src: templates/litellm-config.yaml.j2
@@ -27,7 +35,7 @@
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
-    name: container-litellm.service
+    name: litellm.service
     daemon_reload: true
     enabled: true
     scope: user

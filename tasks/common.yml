@@ -9,11 +9,12 @@
 - name: Install Packages
   ansible.builtin.apt:
     name:
+      - acl
       - podman
       - ufw
     state: present
 
-- name: Configure Firewall Rules
+- name: Configure Base Firewall Rules
   community.general.ufw:
     rule: allow
     port: "{{ item }}"
@@ -22,6 +23,19 @@
     - "22"
     - "{{ openwebui.port }}"
     - "{{ litellm.port }}"
+
+- name: Configure llama.cpp Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: >-
+    {{
+      llamacpp.models
+      | map(attribute='port')
+      | map('string')
+      | list
+    }}
 
 - name: Configure and Enable Firewall Defaults
   community.general.ufw:

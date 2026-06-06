@@ -16,7 +16,7 @@
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
-    name: container-openwebui.service
+    name: openwebui.service
     daemon_reload: true
     enabled: true
     scope: user

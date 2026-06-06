@@ -10,7 +10,7 @@
     name: "llamacpp-{{ model.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     publish:
-      - "{{ model.port }}:{{ model.port }}/tcp"
+      - "{{ model.port }}:8080/tcp"
     volume:
       - "llamacpp-{{ model.name }}:/root/.cache/llama.cpp"
     device:
@@ -31,7 +31,7 @@
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
-    name: "container-llamacpp-{{ model.name }}.service"
+    name: "llamacpp-{{ model.name }}.service"
     daemon_reload: true
     enabled: true
     scope: user

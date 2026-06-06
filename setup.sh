@@ -4,32 +4,46 @@ set -euo pipefail
 DEV_MODE=false
 
 while [[ $# -gt 0 ]]; do
-  case $1 in
-    --dev) DEV_MODE=true; shift ;;
-    *) shift ;;
+  case "$1" in
+    --dev)
+      DEV_MODE=true
+      ;;
   esac
+  shift
 done
 
-# install uv (skip if already on PATH)
-if ! command -v uv &> /dev/null; then
+if ! command -v uv >/dev/null 2>&1; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
-  source $HOME/.local/bin/env
+  export PATH="$HOME/.local/bin:$PATH"
 fi
 
 if $DEV_MODE; then
   uv sync --all-groups
-else
-  uv sync --no-dev
   uv run ansible-galaxy collection install -r requirements.yml
-
-  # user input
-  read -rp "Target Endpoint (default: localhost): " host
-  host="${host:-localhost}"
-
-  # run playbook
-  if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
-    uv run ansible-playbook -i "${host}," --connection=local --ask-become-pass deploy.yml
-  else
-    uv run ansible-playbook -i "${host}," --ask-pass --ask-become-pass deploy.yml
-  fi
+  exit 0
 fi
+
+uv sync --no-dev
+uv run ansible-galaxy collection install -r requirements.yml
+
+read -rp "Target Endpoint (default: localhost): " host
+host="${host:-localhost}"
+
+cmd=(
+  uv run ansible-playbook
+  -i "${host},"
+  deploy.yml
+)
+
+case "$host" in
+  localhost|127.0.0.1)
+    cmd+=(--connection=local --ask-become-pass)
+    ;;
+  *)
+    read -rp "Target User (default: ubuntu): " user
+    user="${user:-ubuntu}"
+    cmd+=(-u "$user" --ask-pass --ask-become-pass)
+    ;;
+esac
+
+"${cmd[@]}"
