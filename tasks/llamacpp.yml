@@ -20,12 +20,7 @@
       - keep-groups
     env: "{{ model.environment_variables | default({}) }}"
     state: quadlet
-    command: >-
-      {{
-        model.command
-        | dict2items
-        | map('community.general.json_query', '{k: key, v: value}')
-      }}
+    command: "{{ model.command }}"
 
 - name: Start llama.cpp Systemd Units
   become: true

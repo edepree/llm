@@ -33,8 +33,4 @@ llamacpp:
         LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
         LLAMA_ARG_SPEC_TYPE: draft-mtp
         LLAMA_ARG_THREADS: 32
-      command:
-        temp: 1.0
-        top-p: 0.95
-        top-k: 20
-        min-p: 0.00
+      command: --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.00
