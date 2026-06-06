@@ -1,0 +1,14 @@
+---
+- name: Install ROCm Packages
+  ansible.builtin.apt:
+    name: rocm
+    autoclean: true
+    autoremove: true
+    update_cache: true
+
+# https://rocm.docs.amd.com/en/latest/how-to/system-optimization/strixhalo.html
+- name: Set TTM Pages Limits
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/ttm.conf
+    content: |
+      options ttm pages_limit={{ ttm_pages_limit }}

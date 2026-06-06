@@ -10,6 +10,9 @@
     - name: Common Hosts Tasks
       ansible.builtin.import_tasks: tasks/common.yml
 
+    - name: Setup ROCm
+      ansible.builtin.import_tasks: tasks/rocm.yml
+
     - name: Service Account Creation
       ansible.builtin.import_tasks: tasks/service-account.yml
 
