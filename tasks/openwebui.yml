@@ -1,5 +1,6 @@
 ---
 - name: Deploy OpenWebUI Quadlet
+  become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: openwebui
@@ -12,6 +13,7 @@
     state: quadlet
 
 - name: Start OpenWebUI Systemd Unit
+  become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
     name: container-openwebui.service

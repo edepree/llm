@@ -4,6 +4,7 @@
   loop_control:
     loop_var: model
     label: "llamacpp-{{ model.name }}"
+  become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: "llamacpp-{{ model.name }}"
@@ -27,6 +28,7 @@
       }}
 
 - name: Start llama.cpp Systemd Units
+  become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
     name: "container-llamacpp-{{ model.name }}.service"

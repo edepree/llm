@@ -12,3 +12,4 @@
     dest: /etc/modprobe.d/ttm.conf
     content: |
       options ttm pages_limit={{ ttm_pages_limit }}
+    mode: "0644"

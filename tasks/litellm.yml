@@ -8,6 +8,7 @@
     mode: "0644"
 
 - name: Deploy LiteLLM Quadlet
+  become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: litellm
@@ -23,6 +24,7 @@
     state: quadlet
 
 - name: Start LiteLLM Systemd Unit
+  become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
     name: container-litellm.service
