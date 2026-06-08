@@ -12,16 +12,16 @@ bifrost:
 openwebui:
   port: 8080
   environment_variables:
-    # OLLAMA_BASE_URL: http://host.containers.internal:8000
-    # ENABLE_OPENAI_API: false
-    WEBUI_AUTH: false
-    ENABLE_TITLE_GENERATION: false
     ENABLE_FOLLOW_UP_GENERATION: false
-    ENABLE_TAGS_GENERATION: false
-    ENABLE_RETRIEVAL_QUERY_GENERATION: false
     ENABLE_IMAGE_PROMPT_GENERATION: false
-    ENABLE_WEB_SEARCH: false
+    ENABLE_OLLAMA_API: false
+    ENABLE_RETRIEVAL_QUERY_GENERATION: false
     ENABLE_SEARCH_QUERY_GENERATION: false
+    ENABLE_TAGS_GENERATION: false
+    ENABLE_TITLE_GENERATION: false
+    ENABLE_WEB_SEARCH: false
+    OPENAI_API_BASE_URL: http://bifrost:8080/v1
+    WEBUI_AUTH: false
 
 llamacpp:
   models:
