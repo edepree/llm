@@ -1,5 +1,5 @@
 ---
-- name: Update and Upgrade Operating System 
+- name: Update and Upgrade Operating System
   ansible.builtin.apt:
     autoclean: true
     autoremove: true
@@ -14,6 +14,15 @@
       - ufw
     state: present
 
+- name: Set Minimum Unprivileged Port
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_unprivileged_port_start
+    value: 80
+    state: present
+    sysctl_set: true
+    reload: true
+    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
+
 - name: Configure Base Firewall Rules
   community.general.ufw:
     rule: allow
@@ -22,7 +31,7 @@
   loop:
     - "22"
     - "{{ openwebui.port }}"
-    - "{{ bifrost.port }}"
+    - "{{ router.port }}"
 
 - name: Configure llama.cpp Firewall Rules
   community.general.ufw:

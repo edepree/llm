@@ -5,12 +5,12 @@ ttm_pages_limit: 26214400 # 100 GB
 service_account:
   name: llm
 
-bifrost:
+router:
   name: bifrost
-  port: 4000
+  port: 8080
 
 openwebui:
-  port: 8080
+  port: 80
   environment_variables:
     ENABLE_FOLLOW_UP_GENERATION: false
     ENABLE_IMAGE_PROMPT_GENERATION: false
@@ -20,7 +20,7 @@ openwebui:
     ENABLE_TAGS_GENERATION: false
     ENABLE_TITLE_GENERATION: false
     ENABLE_WEB_SEARCH: false
-    OPENAI_API_BASE_URL: http://bifrost:8080/v1
+    OPENAI_API_BASE_URL: "http://{{ router.name }}:8080/v1"
     WEBUI_AUTH: false
 
 llamacpp:

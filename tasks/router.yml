@@ -1,48 +1,48 @@
 ---
-- name: Create Bifrost Configuration Directory
+- name: Create Configuration Directory for {{ router.name | title }}
   ansible.builtin.file:
-    path: "/home/{{ service_account.name }}/.config/bifrost"
+    path: "/home/{{ service_account.name }}/.config/{{ router.name }}"
     state: directory
     owner: "{{ service_account.name }}"
     group: "{{ service_account.name }}"
     mode: "0755"
 
-- name: Deploy Bifrost Configuration
+- name: Deploy Configuration for {{ router.name | title }}
   ansible.builtin.template:
-    src: templates/bifrost-config.json.j2
-    dest: "/home/{{ service_account.name }}/.config/bifrost/config.json"
+    src: templates/router-config.json.j2
+    dest: "/home/{{ service_account.name }}/.config/{{ router.name }}/config.json"
     owner: "{{ service_account.name }}"
     group: "{{ service_account.name }}"
     mode: "0644"
 
-- name: Create Podman network
+- name: Create Podman Network
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_network:
     name: artificial-intelligence
     state: present
 
-- name: Deploy Bifrost Quadlet
+- name: Deploy Quadlet for {{ router.name | title }}
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
-    name: "{{ bifrost.name }}"
+    name: "{{ router.name }}"
     image: docker.io/maximhq/bifrost
     network:
       - artificial-intelligence
     publish:
-      - "{{ bifrost.port }}:8080/tcp"
+      - "{{ router.port }}:8080/tcp"
     volume:
-      - "/home/{{ service_account.name }}/.config/bifrost/config.json:/app/data/config.json:ro"
-      - "{{ bifrost.name }}:/app/data"
+      - "/home/{{ service_account.name }}/.config/{{ router.name }}/config.json:/app/data/config.json:ro"
+      - "{{ router.name }}:/app/data"
     env:
     state: quadlet
 
-- name: Start Bifrost Systemd Unit
+- name: Start Systemd Unit for {{ router.name | title }}
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
-    name: "{{ bifrost.name }}.service"
+    name: "{{ router.name }}.service"
     daemon_reload: true
     enabled: true
     scope: user

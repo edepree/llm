@@ -19,8 +19,8 @@
     - name: Setup llama.cpp
       ansible.builtin.import_tasks: tasks/llamacpp.yml
 
-    - name: Setup Bifrost
-      ansible.builtin.import_tasks: tasks/bifrost.yml
+    - name: Setup Model Router
+      ansible.builtin.import_tasks: tasks/router.yml
 
     - name: Import OpenWebUI
       ansible.builtin.import_tasks: tasks/openwebui.yml
