@@ -22,7 +22,7 @@
   loop:
     - "22"
     - "{{ openwebui.port }}"
-    - "{{ litellm.port }}"
+    - "{{ bifrost.port }}"
 
 - name: Configure llama.cpp Firewall Rules
   community.general.ufw:

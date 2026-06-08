@@ -1,0 +1,35 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "client": {
+    "drop_excess_requests": false
+  },
+  "providers": {
+    "openai-custom": {
+      "custom_provider_config": {
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true,
+          "embedding": false,
+          "list_models": true,
+          "responses": true,
+          "responses_stream": true,
+          "speech": false,
+          "speech_stream": false,
+          "text_completion": true,
+          "text_completion_stream": true,
+          "transcription": false,
+          "transcription_stream": false
+        },
+        "base_provider_type": "openai",
+        "is_key_less": true,
+        "properties": {
+          "is_key_less": true
+        }
+      },
+      "network_config": {
+        "allow_private_network": true,
+        "base_url": "http://llamacpp-qwen-36-reasoning:8080"
+      }
+    }
+  }
+}

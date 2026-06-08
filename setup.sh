@@ -26,8 +26,8 @@ fi
 uv sync --no-dev
 uv run ansible-galaxy collection install -r requirements.yml
 
-read -rp "Target Endpoint (default: localhost): " host
-host="${host:-localhost}"
+read -rp "Target Endpoint (default: lisa.home.arpa): " host
+host="${host:-lisa.home.arpa}"
 
 cmd=(
   uv run ansible-playbook

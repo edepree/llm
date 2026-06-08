@@ -1,10 +1,19 @@
 ---
+- name: Create Podman network
+  become: true
+  become_user: "{{ service_account.name }}"
+  containers.podman.podman_network:
+    name: artificial-intelligence
+    state: present
+
 - name: Deploy OpenWebUI Quadlet
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
     name: openwebui
     image: ghcr.io/open-webui/open-webui:latest
+    network:
+      - artificial-intelligence
     publish:
       - "{{ openwebui.port }}:8080/tcp"
     volume:

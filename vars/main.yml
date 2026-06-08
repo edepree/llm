@@ -5,7 +5,8 @@ ttm_pages_limit: 26214400 # 100 GB
 service_account:
   name: llm
 
-litellm:
+bifrost:
+  name: bifrost
   port: 4000
 
 openwebui:

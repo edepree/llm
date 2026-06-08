@@ -1,4 +1,11 @@
 ---
+- name: Create Podman network
+  become: true
+  become_user: "{{ service_account.name }}"
+  containers.podman.podman_network:
+    name: artificial-intelligence
+    state: present
+
 - name: Create llama.cpp Quadlet Container
   loop: "{{ llamacpp.models }}"
   loop_control:
@@ -9,6 +16,8 @@
   containers.podman.podman_container:
     name: "llamacpp-{{ model.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
+    network:
+      - artificial-intelligence
     publish:
       - "{{ model.port }}:8080/tcp"
     volume:
