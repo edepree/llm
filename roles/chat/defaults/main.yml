@@ -1,0 +1,15 @@
+---
+# Chat (OpenWebUI) role defaults
+
+openwebui:
+  port: 80
+  environment_variables:
+    ENABLE_FOLLOW_UP_GENERATION: false
+    ENABLE_IMAGE_PROMPT_GENERATION: false
+    ENABLE_OLLAMA_API: false
+    ENABLE_RETRIEVAL_QUERY_GENERATION: false
+    ENABLE_SEARCH_QUERY_GENERATION: false
+    ENABLE_TAGS_GENERATION: false
+    ENABLE_TITLE_GENERATION: false
+    ENABLE_WEB_SEARCH: false
+    OPENAI_API_BASE_URL: "http://{{ router.name }}:{{ router.port }}/v1"

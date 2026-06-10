@@ -4,7 +4,8 @@
     "drop_excess_requests": false
   },
   "providers": {
-    "llamacpp-01": {
+{% for model in llamacpp.models %}
+    "{{ model.name | replace(' ', '-') }}": {
       "custom_provider_config": {
         "allowed_requests": {
           "chat_completion": true,
@@ -28,8 +29,9 @@
       },
       "network_config": {
         "allow_private_network": true,
-        "base_url": "http://llamacpp-qwen-36-reasoning:8080"
+        "base_url": "http://llamacpp-{{ model.name | replace(' ', '-') }}:{{ model.port | default(8080) }}"
       }
-    }
+    }{% if not loop.last %},{% endif %}
+{% endfor %}
   }
 }

@@ -1,0 +1,15 @@
+---
+# Inference (llama.cpp) role defaults
+
+llamacpp:
+  models:
+    - name: qwen-36-reasoning
+      port: 9000
+      environment_variables:
+        LLAMA_ARG_CTX_SIZE: 262144
+        LLAMA_ARG_HF_REPO: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+        LLAMA_ARG_N_GPU_LAYERS: 999
+        LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
+        LLAMA_ARG_SPEC_TYPE: draft-mtp
+        LLAMA_ARG_THREADS: 32
+      command: --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.00
