@@ -4,7 +4,7 @@
     "drop_excess_requests": false
   },
   "providers": {
-{% for model in llamacpp.models %}
+{% for model in inference_llamacpp.models %}
     "{{ model.name | replace(' ', '-') }}": {
       "custom_provider_config": {
         "allowed_requests": {
