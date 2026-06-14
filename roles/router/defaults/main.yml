@@ -1,6 +1,4 @@
 ---
-# Router role defaults
-
-router_router:
+router_bifrost:
   name: bifrost
   port: 8080

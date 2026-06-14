@@ -1,12 +1,12 @@
 ---
-- name: Create Podman network
+- name: Create Podman Network
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_network:
     name: artificial-intelligence
     state: present
 
-- name: Create llama.cpp Quadlet Container
+- name: Deploy Quadlet for Inference Container
   loop: "{{ inference_llamacpp.models }}"
   loop_control:
     loop_var: model
@@ -31,7 +31,7 @@
     state: quadlet
     command: "{{ model.command }}"
 
-- name: Start llama.cpp Systemd Units
+- name: Start Systemd Unit for Inference Container
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:

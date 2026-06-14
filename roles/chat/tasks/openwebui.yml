@@ -1,31 +1,31 @@
 ---
-- name: Create Podman network
+- name: Create Podman Network
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_network:
     name: artificial-intelligence
     state: present
 
-- name: Deploy OpenWebUI Quadlet
+- name: Deploy Quadlet for Chat Container
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
-    name: openwebui
+    name: "{{ chat_openwebui.name }}"
     image: ghcr.io/open-webui/open-webui:latest
     network:
       - artificial-intelligence
     publish:
       - "{{ chat_openwebui.port }}:8080/tcp"
     volume:
-      - "openwebui:/app/backend/data"
+      - "{{ chat_openwebui.name }}:/app/backend/data"
     env: "{{ chat_openwebui.environment_variables | default({}) }}"
     state: quadlet
 
-- name: Start OpenWebUI Systemd Unit
+- name: Start Systemd Unit for Chat Container
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
-    name: openwebui.service
+    name: "{{ chat_openwebui.name }}"
     daemon_reload: true
     enabled: true
     scope: user
