@@ -1,30 +1,30 @@
 ---
 - name: Create Configuration Directory for {{ router_bifrost.name | title }}
   ansible.builtin.file:
-    path: "/home/{{ service_account.name }}/.config/{{ router_bifrost.name }}"
+    path: "/home/{{ common_service_account.name }}/.config/{{ router_bifrost.name }}"
     state: directory
-    owner: "{{ service_account.name }}"
-    group: "{{ service_account.name }}"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
     mode: "0755"
 
 - name: Deploy Configuration for {{ router_bifrost.name | title }}
   ansible.builtin.template:
     src: templates/router-config.json.j2
-    dest: "/home/{{ service_account.name }}/.config/{{ router_bifrost.name }}/config.json"
-    owner: "{{ service_account.name }}"
-    group: "{{ service_account.name }}"
+    dest: "/home/{{ common_service_account.name }}/.config/{{ router_bifrost.name }}/config.json"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
     mode: "0644"
 
 - name: Create Podman Network
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   containers.podman.podman_network:
     name: artificial-intelligence
     state: present
 
 - name: Deploy Quadlet for Router Container
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   containers.podman.podman_container:
     name: "{{ router_bifrost.name }}"
     image: docker.io/maximhq/bifrost
@@ -33,14 +33,14 @@
     publish:
       - "{{ router_bifrost.port }}:8080/tcp"
     volume:
-      - "/home/{{ service_account.name }}/.config/{{ router_bifrost.name }}/config.json:/app/data/config.json:ro"
+      - "/home/{{ common_service_account.name }}/.config/{{ router_bifrost.name }}/config.json:/app/data/config.json:ro"
       - "{{ router_bifrost.name }}:/app/data"
     env:
     state: quadlet
 
 - name: Start Systemd Unit for Router Container
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   ansible.builtin.systemd:
     name: "{{ router_bifrost.name }}.service"
     daemon_reload: true

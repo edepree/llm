@@ -11,5 +11,5 @@
   ansible.builtin.copy:
     dest: /etc/modprobe.d/ttm.conf
     content: |
-      options ttm pages_limit={{ ttm_pages_limit }}
+      options ttm pages_limit={{ common_rocm.ttm_pages_limit }}
     mode: "0644"

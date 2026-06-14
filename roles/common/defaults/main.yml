@@ -1,1 +1,6 @@
 ---
+common_service_account:
+  name: llm
+
+common_rocm:
+  ttm_pages_limit: 26214400 # 100 GB

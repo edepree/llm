@@ -1,14 +1,14 @@
 ---
 - name: Create Podman Network
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   containers.podman.podman_network:
     name: artificial-intelligence
     state: present
 
 - name: Deploy Quadlet for Chat Container
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   containers.podman.podman_container:
     name: "{{ chat_openwebui.name }}"
     image: ghcr.io/open-webui/open-webui:latest
@@ -23,7 +23,7 @@
 
 - name: Start Systemd Unit for Chat Container
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   ansible.builtin.systemd:
     name: "{{ chat_openwebui.name }}"
     daemon_reload: true

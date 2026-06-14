@@ -32,7 +32,7 @@ host="${host:-lisa.home.arpa}"
 cmd=(
   uv run ansible-playbook
   -i "${host},"
-  deploy.yml
+  playbook.yml
 )
 
 case "$host" in

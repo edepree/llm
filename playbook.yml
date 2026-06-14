@@ -3,14 +3,6 @@
   hosts: all
   become: true
 
-  pre_tasks:
-    - name: Ensure XDG_RUNTIME_DIR is set for root
-      ansible.builtin.shell: |
-        if [ -z "$XDG_RUNTIME_DIR" ]; then
-          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-        fi
-      changed_when: false
-
   roles:
     - role: common
 

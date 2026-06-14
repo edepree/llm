@@ -1,7 +1,7 @@
 ---
 - name: Create Podman Network
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   containers.podman.podman_network:
     name: artificial-intelligence
     state: present
@@ -12,7 +12,7 @@
     loop_var: model
     label: "llamacpp-{{ model.name }}"
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   containers.podman.podman_container:
     name: "llamacpp-{{ model.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
@@ -33,7 +33,7 @@
 
 - name: Start Systemd Unit for Inference Container
   become: true
-  become_user: "{{ service_account.name }}"
+  become_user: "{{ common_service_account.name }}"
   ansible.builtin.systemd:
     name: "llamacpp-{{ model.name }}.service"
     daemon_reload: true
