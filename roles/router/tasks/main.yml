@@ -1,0 +1,3 @@
+---
+- name: Include Bifrost Tasks
+  ansible.builtin.import_tasks: bifrost.yml

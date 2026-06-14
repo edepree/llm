@@ -1,0 +1,15 @@
+---
+- name: Include Common Tasks
+  ansible.builtin.import_tasks: common.yml
+
+- name: Include service-account Tasks
+  ansible.builtin.import_tasks: service-account.yml
+
+- name: Include Updates Tasks
+  ansible.builtin.import_tasks: updates.yml
+
+- name: Include Firewall Tasks
+  ansible.builtin.import_tasks: firewall.yml
+
+- name: Include ROCm Tasks
+  ansible.builtin.import_tasks: rocm.yml

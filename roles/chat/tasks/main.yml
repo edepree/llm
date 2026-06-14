@@ -1,0 +1,3 @@
+---
+- name: Include OpenWebUI Tasks
+  ansible.builtin.import_tasks: openwebui.yml
