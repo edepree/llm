@@ -1,7 +1,7 @@
 ---
 # Inference (llama.cpp) role defaults
 
-llamacpp:
+inference_llamacpp:
   models:
     - name: qwen-36-reasoning
       port: 9000

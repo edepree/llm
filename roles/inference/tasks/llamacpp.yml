@@ -7,7 +7,7 @@
     state: present
 
 - name: Create llama.cpp Quadlet Container
-  loop: "{{ llamacpp.models }}"
+  loop: "{{ inference_llamacpp.models }}"
   loop_control:
     loop_var: model
     label: "llamacpp-{{ model.name }}"
@@ -40,7 +40,7 @@
     enabled: true
     scope: user
     state: started
-  loop: "{{ llamacpp.models }}"
+  loop: "{{ inference_llamacpp.models }}"
   loop_control:
     loop_var: model
     label: "{{ model.name }}"

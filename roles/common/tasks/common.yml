@@ -30,8 +30,8 @@
     proto: tcp
   loop:
     - "22"
-    - "{{ openwebui.port }}"
-    - "{{ router.port }}"
+    - "{{ chat_openwebui.port }}"
+    - "{{ router_router.port }}"
 
 - name: Configure llama.cpp Firewall Rules
   community.general.ufw:
@@ -40,7 +40,7 @@
     proto: tcp
   loop: >-
     {{
-      llamacpp.models
+      inference_llamacpp.models
       | map(attribute='port')
       | map('string')
       | list

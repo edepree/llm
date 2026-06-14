@@ -1,16 +1,16 @@
 ---
-- name: Create Configuration Directory for {{ router.name | title }}
+- name: Create Configuration Directory for {{ router_router.name | title }}
   ansible.builtin.file:
-    path: "/home/{{ service_account.name }}/.config/{{ router.name }}"
+    path: "/home/{{ service_account.name }}/.config/{{ router_router.name }}"
     state: directory
     owner: "{{ service_account.name }}"
     group: "{{ service_account.name }}"
     mode: "0755"
 
-- name: Deploy Configuration for {{ router.name | title }}
+- name: Deploy Configuration for {{ router_router.name | title }}
   ansible.builtin.template:
     src: templates/router-config.json.j2
-    dest: "/home/{{ service_account.name }}/.config/{{ router.name }}/config.json"
+    dest: "/home/{{ service_account.name }}/.config/{{ router_router.name }}/config.json"
     owner: "{{ service_account.name }}"
     group: "{{ service_account.name }}"
     mode: "0644"
@@ -22,27 +22,27 @@
     name: artificial-intelligence
     state: present
 
-- name: Deploy Quadlet for {{ router.name | title }}
+- name: Deploy Quadlet for {{ router_router.name | title }}
   become: true
   become_user: "{{ service_account.name }}"
   containers.podman.podman_container:
-    name: "{{ router.name }}"
+    name: "{{ router_router.name }}"
     image: docker.io/maximhq/bifrost
     network:
       - artificial-intelligence
     publish:
-      - "{{ router.port }}:8080/tcp"
+      - "{{ router_router.port }}:8080/tcp"
     volume:
-      - "/home/{{ service_account.name }}/.config/{{ router.name }}/config.json:/app/data/config.json:ro"
-      - "{{ router.name }}:/app/data"
+      - "/home/{{ service_account.name }}/.config/{{ router_router.name }}/config.json:/app/data/config.json:ro"
+      - "{{ router_router.name }}:/app/data"
     env:
     state: quadlet
 
-- name: Start Systemd Unit for {{ router.name | title }}
+- name: Start Systemd Unit for {{ router_router.name | title }}
   become: true
   become_user: "{{ service_account.name }}"
   ansible.builtin.systemd:
-    name: "{{ router.name }}.service"
+    name: "{{ router_router.name }}.service"
     daemon_reload: true
     enabled: true
     scope: user

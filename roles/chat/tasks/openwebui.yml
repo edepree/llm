@@ -15,10 +15,10 @@
     network:
       - artificial-intelligence
     publish:
-      - "{{ openwebui.port }}:8080/tcp"
+      - "{{ chat_openwebui.port }}:8080/tcp"
     volume:
       - "openwebui:/app/backend/data"
-    env: "{{ openwebui.environment_variables | default({}) }}"
+    env: "{{ chat_openwebui.environment_variables | default({}) }}"
     state: quadlet
 
 - name: Start OpenWebUI Systemd Unit
