@@ -1,14 +1,25 @@
 ---
 inference_llamacpp:
   models:
-    - name: qwen-36-reasoning
+    - name: inference-01
       port: 9000
       environment_variables:
-        LLAMA_ARG_ALIAS: qwen-36-reasoning
+        LLAMA_ARG_ALIAS: qwen-36-thinking
         LLAMA_ARG_CTX_SIZE: 262144
         LLAMA_ARG_HF_REPO: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
         LLAMA_ARG_N_GPU_LAYERS: 999
         LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
         LLAMA_ARG_SPEC_TYPE: draft-mtp
         LLAMA_ARG_THREADS: 32
-      command: --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.00
+      command: --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.00 --presence_penalty=0.0 --repetition_penalty=1.0
+    - name: inference-02
+      port: 9001
+      environment_variables:
+        LLAMA_ARG_ALIAS: qwen-36-instruct
+        LLAMA_ARG_CTX_SIZE: 131072
+        LLAMA_ARG_HF_REPO: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+        LLAMA_ARG_N_GPU_LAYERS: 999
+        LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
+        LLAMA_ARG_SPEC_TYPE: draft-mtp
+        LLAMA_ARG_THREADS: 32
+      command: --temp 0.7 --top-p 0.8 --top-k 20 --min-p 0.00 --presence_penalty=1.5 --repetition_penalty=1.0 --chat-template-kwargs '{"enable_thinking":false}'
