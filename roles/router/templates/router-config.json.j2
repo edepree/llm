@@ -5,7 +5,7 @@
   },
   "providers": {
 {% for model in inference_llamacpp.models %}
-    "{{ model.name | replace(' ', '-') }}": {
+    "llamacpp-{{ loop.index | string | zfill(2) }}": {
       "custom_provider_config": {
         "allowed_requests": {
           "chat_completion": true,
