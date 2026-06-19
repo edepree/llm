@@ -4,7 +4,7 @@
     "drop_excess_requests": false
   },
   "providers": {
-{% for model in inference_llamacpp.models %}
+{% for model in inference_llamacpp.models -%}
     "llamacpp-{{ loop.index | string | zfill(2) }}": {
       "custom_provider_config": {
         "allowed_requests": {
@@ -27,6 +27,6 @@
         "base_url": "http://llamacpp-{{ model.name | replace(' ', '-') }}:8080"
       }
     }{% if not loop.last %},{% endif %}
-{% endfor %}
+{% endfor -%}
   }
 }

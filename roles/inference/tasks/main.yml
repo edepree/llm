@@ -1,3 +1,46 @@
 ---
-- name: Include llama.cpp Tasks
-  ansible.builtin.import_tasks: llamacpp.yml
+- name: Deploy Quadlet for Inference Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  loop: "{{ inference_llamacpp.models }}"
+  loop_control:
+    loop_var: model
+    label: "llamacpp-{{ model.name }}"
+  containers.podman.podman_container:
+    name: "llamacpp-{{ model.name }}"
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm
+    network:
+      - artificial-intelligence
+    publish:
+      - "{{ model.port }}:8080/tcp"
+    volume:
+      - "llamacpp-{{ model.name }}:/root/.cache/llama.cpp"
+    device:
+      - /dev/dri
+      - /dev/kfd
+    group_add:
+      - keep-groups
+    env: "{{ model.environment_variables | default({}) }}"
+    state: quadlet
+    command: "{{ model.command }}"
+
+- name: Start Systemd Unit for Inference Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  loop: "{{ inference_llamacpp.models }}"
+  loop_control:
+    loop_var: model
+    label: "{{ model.name }}"
+  ansible.builtin.systemd:
+    name: "llamacpp-{{ model.name }}.service"
+    daemon_reload: true
+    enabled: true
+    scope: user
+    state: started
+
+- name: Configure Inference Container Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port | string }}"
+    proto: tcp
+  loop: "{{ inference_llamacpp.models }}"

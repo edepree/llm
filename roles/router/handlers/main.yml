@@ -1,0 +1,11 @@
+---
+- name: Daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+
+- name: Start router container
+  ansible.builtin.systemd:
+    name: "{{ router_bifrost.name }}.service"
+    scope: user
+    state: started

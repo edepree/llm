@@ -1,0 +1,14 @@
+---
+- name: Daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+
+- name: Start inference container
+  ansible.builtin.systemd:
+    name: "llamacpp-{{ model.name }}.service"
+    scope: user
+    state: started
+  loop: "{{ inference_llamacpp.models }}"
+  loop_control:
+    loop_var: model

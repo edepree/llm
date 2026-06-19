@@ -1,0 +1,3 @@
+---
+rocm_enabled: false
+rocm_ttm_pages_limit: 26214400

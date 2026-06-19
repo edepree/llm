@@ -2,15 +2,87 @@
 - name: Deploy LLM Stack
   hosts: all
   become: true
+  vars:
+    common_packages:
+      - acl
+      - podman
+      - ufw
+
+    common_journald_maxuse: 1G
+
+    common_service_account:
+      name: llm
+
+    svc_account_groups:
+      - render
+      - video
+
+    router_bifrost:
+      name: bifrost
+      port: 8080
+
+    chat_openwebui:
+      name: openwebui
+      port: 80
+      environment_variables:
+        ENABLE_FOLLOW_UP_GENERATION: false
+        ENABLE_IMAGE_PROMPT_GENERATION: false
+        ENABLE_OLLAMA_API: false
+        ENABLE_RETRIEVAL_QUERY_GENERATION: false
+        ENABLE_SEARCH_QUERY_GENERATION: false
+        ENABLE_TAGS_GENERATION: false
+        ENABLE_TITLE_GENERATION: false
+        ENABLE_WEB_SEARCH: false
+        OPENAI_API_BASE_URL: "http://{{ router_bifrost.name }}:{{ router_bifrost.port }}/v1"
+
+    inference_llamacpp:
+      models:
+        - name: qwen-36-reasoning
+          port: 9000
+          environment_variables:
+            LLAMA_ARG_ALIAS: qwen-36-reasoning
+            LLAMA_ARG_CTX_SIZE: 262144
+            LLAMA_ARG_HF_REPO: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+            LLAMA_ARG_N_GPU_LAYERS: 999
+            LLAMA_ARG_SPEC_DRAFT_N_MAX: 2
+            LLAMA_ARG_SPEC_TYPE: draft-mtp
+            LLAMA_ARG_THREADS: 32
+          command: --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.00
+
+  pre_tasks:
+    - name: Verify target is Ubuntu/Debian
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == 'Debian'
+        fail_msg: "This playbook requires Ubuntu or Debian"
 
   roles:
     - role: common
+      tags: [common, system]
+
+    - role: service-account
+      tags: [accounts]
+      when: svc_account_enabled | default(true)
+
+    - role: system-hardening
+      tags: [hardening, updates]
+      when: sys_hardening_enable_updates | default(true)
+
+    - role: rocm
+      tags: [rocm, gpu]
+      when: rocm_enabled | default(false)
+
+    - role: podman-setup
+      tags: [podman, infrastructure]
 
     - role: inference
+      tags: [inference, llamacpp]
       when: inference_enabled | default(true)
 
     - role: router
+      tags: [router, bifrost]
       when: router_enabled | default(true)
 
     - role: chat
+      tags: [chat, openwebui]
       when: chat_enabled | default(true)

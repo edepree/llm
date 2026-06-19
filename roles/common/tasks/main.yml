@@ -1,15 +1,53 @@
 ---
-- name: Include Common Tasks
-  ansible.builtin.import_tasks: common.yml
+- name: Update and Upgrade Operating System
+  ansible.builtin.apt:
+    autoclean: true
+    autoremove: true
+    update_cache: true
+    upgrade: safe
 
-- name: Include service-account Tasks
-  ansible.builtin.import_tasks: service-account.yml
+- name: Install Packages
+  ansible.builtin.apt:
+    name: "{{ common_packages }}"
+    state: present
 
-- name: Include Updates Tasks
-  ansible.builtin.import_tasks: updates.yml
+- name: Set Minimum Unprivileged Port
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_unprivileged_port_start
+    value: 80
+    state: present
+    sysctl_set: true
+    reload: true
+    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
+  notify: Reload sysctl
 
-- name: Include Firewall Tasks
-  ansible.builtin.import_tasks: firewall.yml
+- name: Ensure journald.conf.d Directory
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
-- name: Include ROCm Tasks
-  ansible.builtin.import_tasks: rocm.yml
+- name: Limit journald On-Disk Usage
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/99-size-limits.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Journal]
+      SystemMaxUse={{ common_journald_maxuse }}
+  notify: Restart journald
+
+- name: Configure Base Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Configure and Enable Firewall Defaults
+  community.general.ufw:
+    default: deny
+    direction: incoming
+    state: enabled

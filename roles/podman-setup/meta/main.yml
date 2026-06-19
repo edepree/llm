@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: LLM Stack Team
+  description: Podman infrastructure — shared container network
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - system
+    - podman
+    - infrastructure
+
+dependencies: []

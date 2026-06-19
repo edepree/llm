@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: LLM Stack Team
+  description: System hardening — automated updates and reboot policy
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - system
+    - updates
+    - hardening
+
+dependencies: []

@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: LLM Stack Team
+  description: ROCm GPU driver installation and configuration
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - system
+    - gpu
+    - rocm
+
+dependencies: []

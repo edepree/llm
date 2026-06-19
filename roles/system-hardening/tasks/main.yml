@@ -10,6 +10,7 @@
       APT::Periodic::Download-Upgradeable-Packages "1";
       APT::Periodic::AutocleanInterval "7";
       APT::Periodic::Unattended-Upgrade "1";
+  notify: Restart unattended-upgrades
 
 - name: Configure Unattended-Upgrades
   ansible.builtin.copy:
@@ -26,9 +27,10 @@
       Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
       Unattended-Upgrade::Remove-Unused-Dependencies "true";
 
-      Unattended-Upgrade::Automatic-Reboot "true";
+      Unattended-Upgrade::Automatic-Reboot "{{ sys_hardening_unattended_reboot | lower }}";
       Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
       Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+  notify: Restart unattended-upgrades
 
 - name: Enable Unattended-Upgrades Service
   ansible.builtin.systemd:

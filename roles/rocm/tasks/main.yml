@@ -5,11 +5,12 @@
     autoclean: true
     autoremove: true
     update_cache: true
+  when: rocm_enabled
 
-# https://rocm.docs.amd.com/en/latest/how-to/system-optimization/strixhalo.html
 - name: Set TTM Pages Limits
   ansible.builtin.copy:
     dest: /etc/modprobe.d/ttm.conf
     content: |
-      options ttm pages_limit={{ common_rocm.ttm_pages_limit }}
+      options ttm pages_limit={{ rocm_ttm_pages_limit }}
     mode: "0644"
+  when: rocm_enabled

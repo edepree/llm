@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  author: LLM Stack Team
+  description: Service account management — user creation and lingering
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - system
+    - accounts
+
+dependencies: []

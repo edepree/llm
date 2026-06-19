@@ -1,0 +1,11 @@
+---
+- name: Daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+
+- name: Start chat container
+  ansible.builtin.systemd:
+    name: "{{ chat_openwebui.name }}.service"
+    scope: user
+    state: started

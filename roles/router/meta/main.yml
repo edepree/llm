@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: LLM Stack Team
+  description: Router container — Bifrost quadlet deployment
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - router
+    - bifrost
+    - podman
+
+dependencies: []

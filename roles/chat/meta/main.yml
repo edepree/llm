@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: LLM Stack Team
+  description: Chat container — OpenWebUI quadlet deployment
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - chat
+    - openwebui
+    - podman
+
+dependencies: []

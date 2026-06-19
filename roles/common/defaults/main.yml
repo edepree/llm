@@ -1,6 +1,13 @@
 ---
+common_packages:
+  - acl
+  - podman
+  - ufw
+
+common_sysctl:
+  net.ipv4.ip_unprivileged_port_start: 80
+
+common_journald_maxuse: 1G
+
 common_service_account:
   name: llm
-
-common_rocm:
-  ttm_pages_limit: 26214400 # 100 GB
