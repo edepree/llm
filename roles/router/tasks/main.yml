@@ -1,0 +1,42 @@
+---
+- name: Create Configuration Directory for {{ router_bifrost.name | title }}
+  ansible.builtin.file:
+    path: "/home/{{ common_service_account.name }}/.config/{{ router_bifrost.name }}"
+    state: directory
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0755"
+
+- name: Deploy Configuration for {{ router_bifrost.name | title }}
+  ansible.builtin.template:
+    src: templates/router-config.json.j2
+    dest: "/home/{{ common_service_account.name }}/.config/{{ router_bifrost.name }}/config.json"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0644"
+
+- name: Deploy Quadlet for Router Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  containers.podman.podman_container:
+    name: "{{ router_bifrost.name }}"
+    image: docker.io/maximhq/bifrost
+    network:
+      - artificial-intelligence
+    publish:
+      - "{{ router_bifrost.port }}:8080/tcp"
+    volume:
+      - "/home/{{ common_service_account.name }}/.config/{{ router_bifrost.name }}/config.json:/app/data/config.json:ro"
+      - "{{ router_bifrost.name }}:/app/data"
+    state: quadlet
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Router Container
+
+- name: Configure Router Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ router_bifrost.port | string }}"
+    proto: tcp

@@ -1,0 +1,7 @@
+---
+- name: Create Podman Network
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  containers.podman.podman_network:
+    name: "{{ podman_network_name }}"
+    state: present

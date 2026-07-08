@@ -1,0 +1,37 @@
+---
+- name: Deploy Quadlet for Inference Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  loop: "{{ inference_llamacpp.models }}"
+  loop_control:
+    loop_var: model
+    label: "{{ model.name }}"
+  containers.podman.podman_container:
+    name: "{{ model.name }}"
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm
+    network:
+      - artificial-intelligence
+    publish:
+      - "{{ model.port }}:8080/tcp"
+    volume:
+      - "{{ model.name }}:/root/.cache/llama.cpp"
+    device:
+      - /dev/dri
+      - /dev/kfd
+    group_add:
+      - keep-groups
+    env: "{{ model.environment_variables | default({}) }}"
+    state: quadlet
+    command: "{{ model.command }}"
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Inference Container
+
+- name: Configure Inference Container Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.port | string }}"
+    proto: tcp
+  loop: "{{ inference_llamacpp.models }}"

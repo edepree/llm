@@ -1,0 +1,12 @@
+---
+- name: Restart Inference Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  ansible.builtin.systemd:
+    name: "{{ model.name }}.service"
+    scope: user
+    daemon_reload: true
+    state: restarted
+  loop: "{{ inference_llamacpp.models }}"
+  loop_control:
+    loop_var: model

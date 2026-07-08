@@ -1,0 +1,9 @@
+---
+- name: Restart Router Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  ansible.builtin.systemd:
+    name: "{{ router_bifrost.name }}.service"
+    scope: user
+    daemon_reload: true
+    state: started

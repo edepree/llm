@@ -1,0 +1,32 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "client": {
+    "drop_excess_requests": false
+  },
+  "providers": {
+{% for model in inference_llamacpp.models -%}
+    "{{ model.name | replace(' ', '-') }}": {
+      "custom_provider_config": {
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true,
+          "list_models": true,
+          "responses": true,
+          "responses_stream": true,
+          "text_completion": true,
+          "text_completion_stream": true
+        },
+        "base_provider_type": "openai",
+        "is_key_less": true,
+        "properties": {
+          "is_key_less": true
+        }
+      },
+      "network_config": {
+        "allow_private_network": true,
+        "base_url": "http://{{ model.name | replace(' ', '-') }}:8080"
+      }
+    }{% if not loop.last %},{% endif %}
+{% endfor -%}
+  }
+}

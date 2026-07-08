@@ -1,0 +1,26 @@
+---
+- name: Deploy Quadlet for Chat Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  containers.podman.podman_container:
+    name: "{{ chat_openwebui.name }}"
+    image: ghcr.io/open-webui/open-webui:latest
+    network:
+      - artificial-intelligence
+    publish:
+      - "{{ chat_openwebui.port }}:8080/tcp"
+    volume:
+      - "{{ chat_openwebui.name }}:/app/backend/data"
+    env: "{{ chat_openwebui.environment_variables | default({}) }}"
+    state: quadlet
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Chat Container
+
+- name: Configure Chat Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ chat_openwebui.port | string }}"
+    proto: tcp

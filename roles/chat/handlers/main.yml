@@ -1,0 +1,9 @@
+---
+- name: Restart Chat Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  ansible.builtin.systemd:
+    name: "{{ chat_openwebui.name }}.service"
+    scope: user
+    daemon_reload: true
+    state: restarted

@@ -1,0 +1,3 @@
+---
+sys_hardening_enable_updates: true
+sys_hardening_unattended_reboot: false
