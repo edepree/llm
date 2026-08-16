@@ -189,11 +189,17 @@ inference_standalone:
   presets: # one section per model
     - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
       settings:
+        hf-repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL # required unless the model is already in the cache
+        load-on-startup: "true"
         temp: 0.6
         top-p: 0.95
 ```
 
-Keys correspond to llama.cpp CLI arguments without leading dashes (see the [llama.cpp model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Requests select a model by its ID (e.g. `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`).
+Each preset must point at its model: set `hf-repo` (downloaded on demand) or `model` (local path) unless the model already exists in the server's cache.
+
+Keys correspond to llama.cpp CLI arguments without leading dashes (see the [llama.cpp model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Requests select a model by its ID (e.g. `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q8_K_XL`.
+
+Preset-exclusive options are also supported as settings keys, e.g. `load-on-startup: true` downloads and loads the model when the server starts instead of waiting for the first request.
 
 ### Customizing Models (modular mode)
 
@@ -221,7 +227,7 @@ Bifrost config is generated from `roles/router/templates/router-config.json.j2` 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `inference_standalone.port` | `8080` | Standalone llama.cpp listening port |
+| `inference_standalone.port` | `80` | Standalone llama.cpp listening port |
 | `common_service_account.name` | `llm` | Service account for running containers |
 | `podman_network_name` | `artificial-intelligence` | Podman network name |
 | `router_bifrost.port` | `8080` | Bifrost listening port |
