@@ -2,23 +2,44 @@
 inference_standalone:
   name: llamacpp-server
   port: 80
+  models_max: 1
+  cache_path: /root/.cache/huggingface/hub
   global_settings:
     n-gpu-layers: 999
     threads: 32
   presets:
+    - section: unsloth/gpt-oss-20b-GGUF:UD-Q8_K_XL
+      settings:
+        c: 131072
+        hf-repo: unsloth/gpt-oss-20b-GGUF:UD-Q8_K_XL
+        load-on-startup: "true"
+        min-p: 0.00
+        temp: 1.0
+        top-k: 0
+        top-p: 1.0
     - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
       settings:
         c: 131072
         hf-repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
-        load-on-startup: "true"
         min-p: 0.00
         spec-draft-n-max: 2
         spec-type: draft-mtp
         temp: 0.6
         top-k: 20
         top-p: 0.95
+    - section: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
+      settings:
+        c: 262144
+        hf-repo: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
+        min-p: 0.00
+        spec-draft-n-max: 2
+        spec-type: draft-mtp
+        temp: 1.0
+        top-k: 20
+        top-p: 0.95
 
 inference_llamacpp:
+  cache_path: /root/.cache/huggingface/hub
   models:
     - name: llamacpp-inference-01
       port: 9000

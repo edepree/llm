@@ -30,7 +30,7 @@
     publish:
       - "{{ inference_standalone.port }}:8080/tcp"
     volume:
-      - "{{ inference_standalone.name }}:/root/.cache/llama.cpp"
+      - "{{ inference_standalone.name }}:{{ inference_standalone.cache_path }}"
       - "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini:/models-preset.ini:ro"
     device:
       - /dev/dri
@@ -38,7 +38,7 @@
     group_add:
       - keep-groups
     state: quadlet
-    command: --models-preset /models-preset.ini
+    command: --models-preset /models-preset.ini --models-max {{ inference_standalone.models_max }}
     quadlet_options:
       - |
         [Install]
@@ -69,7 +69,7 @@
     publish:
       - "{{ model.port }}:8080/tcp"
     volume:
-      - "{{ model.name }}:/root/.cache/llama.cpp"
+      - "{{ model.name }}:{{ inference_llamacpp.cache_path }}"
     device:
       - /dev/dri
       - /dev/kfd

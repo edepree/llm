@@ -29,6 +29,10 @@ A single llama.cpp server runs with a model preset `.ini` file, serving both the
 
 Chat at `http://<target>` in your browser; the API is available at `http://<target>/v1`.
 
+The server is deployed with a set of model presets defined in `roles/inference/defaults/main.yml` (the source of truth for which models are configured at any point in time), but only `models_max` model(s) are resident at once (default `1`): requesting a different model triggers an automatic LRU unload of an idle one. One preset may be marked `load-on-startup` so it downloads and loads at boot; the rest load on demand.
+
+Requests select a model by its registered ID. The router normalizes quantization tags (stripping prefixes like `UD-`), so check the live list rather than guessing: `curl http://<target>/v1/models`.
+
 ### Modular Mode
 
 After deployment, the following services are available on the target host:
@@ -38,8 +42,8 @@ After deployment, the following services are available on the target host:
 | SSH | 22 | Remote Access |
 | Open WebUI | 80 | Chat Frontend |
 | Bifrost Router | 8080 | OpenAI-Compatible Model Router |
-| llama.cpp (inference 01) | 9000 | Qwen 3.6 Thinking Model |
-| llama.cpp (inference 02) | 9001 | Qwen 3.6 Instruct Model |
+| llama.cpp (inference 01) | 9000 | Model 01 (see `inference_llamacpp` in `roles/inference/defaults/main.yml`) |
+| llama.cpp (inference 02) | 9001 | Model 02 (see `inference_llamacpp` in `roles/inference/defaults/main.yml`) |
 
 ## Managing the Stack
 
@@ -129,8 +133,8 @@ flowchart LR
     end
 
     subgraph Inference
-        INF01["llama.cpp 01\nport 9000\nQwen 3.6 Thinking"]
-        INF02["llama.cpp 02\nport 9001\nQwen 3.6 Instruct"]
+        INF01["llama.cpp 01\nport 9000\nmodel 01"]
+        INF02["llama.cpp 02\nport 9001\nmodel 02"]
     end
 
     subgraph GPU
@@ -177,27 +181,30 @@ The deployment mode is chosen at the `setup.sh` prompt and passed to the playboo
 
 ### Standalone Model Presets
 
-The standalone server is configured through a model preset `.ini` file generated from `inference_standalone` in `roles/inference/defaults/main.yml`:
+The standalone server is configured through a model preset `.ini` file generated from `inference_standalone` in `roles/inference/defaults/main.yml`. See that file for the models, quantizations, and settings deployed at any point in time. The structure looks like this:
 
 ```yaml
 inference_standalone:
   name: llamacpp-server
-  port: 8080
+  port: 80
+  models_max: 1 # max models resident at once; excess are unloaded LRU-style
+  cache_path: /root/.cache/huggingface/hub # model cache, backed by a named volume
   global_settings: # shared defaults for all models ([*] section)
-    c: 131072
     n-gpu-layers: 999
+    threads: 32
   presets: # one section per model
-    - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+    - section: organization/model-GGUF:UD-Q8_K_XL
       settings:
-        hf-repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL # required unless the model is already in the cache
-        load-on-startup: "true"
-        temp: 0.6
-        top-p: 0.95
+        c: 131072
+        hf-repo: organization/model-GGUF:UD-Q8_K_XL # required unless the model is already in the cache
+        load-on-startup: "true" # optional: download and load at boot (use for at most one preset)
+        temp: 1.0
+        top-p: 1.0
 ```
 
 Each preset must point at its model: set `hf-repo` (downloaded on demand) or `model` (local path) unless the model already exists in the server's cache.
 
-Keys correspond to llama.cpp CLI arguments without leading dashes (see the [llama.cpp model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Requests select a model by its ID (e.g. `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:Q8_K_XL`.
+Keys correspond to llama.cpp CLI arguments without leading dashes (see the [llama.cpp model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Requests select a model by its registered ID — list them with `curl http://<target>/v1/models`.
 
 Preset-exclusive options are also supported as settings keys, e.g. `load-on-startup: true` downloads and loads the model when the server starts instead of waiting for the first request.
 
