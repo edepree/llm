@@ -7,7 +7,7 @@
     owner: "{{ common_service_account.name }}"
     group: "{{ common_service_account.name }}"
     mode: "0755"
-  when: llm_stack_mode | default('modular') == 'standalone'
+  when: llm_stack_mode == 'standalone'
 
 - name: Deploy Model Preset Configuration for Standalone llama.cpp
   ansible.builtin.template:
@@ -16,7 +16,7 @@
     owner: "{{ common_service_account.name }}"
     group: "{{ common_service_account.name }}"
     mode: "0644"
-  when: llm_stack_mode | default('modular') == 'standalone'
+  when: llm_stack_mode == 'standalone'
   notify: Restart Standalone Inference Container
 
 - name: Deploy Quadlet for Standalone llama.cpp Container
@@ -43,7 +43,7 @@
       - |
         [Install]
         WantedBy=default.target
-  when: llm_stack_mode | default('modular') == 'standalone'
+  when: llm_stack_mode == 'standalone'
   notify: Restart Standalone Inference Container
 
 - name: Configure Standalone Inference Firewall Rules
@@ -51,7 +51,7 @@
     rule: allow
     port: "{{ inference_standalone.port | string }}"
     proto: tcp
-  when: llm_stack_mode | default('modular') == 'standalone'
+  when: llm_stack_mode == 'standalone'
 
 # modular mode: one llama.cpp container per model, fronted by the model router
 - name: Deploy Quadlet for Inference Container
@@ -82,7 +82,7 @@
       - |
         [Install]
         WantedBy=default.target
-  when: llm_stack_mode | default('modular') != 'standalone'
+  when: llm_stack_mode != 'standalone'
   notify: Restart Inference Container
 
 - name: Configure Inference Container Firewall Rules
@@ -91,4 +91,4 @@
     port: "{{ item.port | string }}"
     proto: tcp
   loop: "{{ inference_llamacpp.models }}"
-  when: llm_stack_mode | default('modular') != 'standalone'
+  when: llm_stack_mode != 'standalone'
