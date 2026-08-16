@@ -20,6 +20,14 @@ inference_standalone:
         temp: 1.0
         top-k: 0
         top-p: 1.0
+    - section: unsloth/Muse-Glimmer-30B-GGUF:UD-Q8_K_XL
+      settings:
+        c: 262144
+        hf-repo: unsloth/Muse-Glimmer-30B-GGUF:UD-Q8_K_XL
+        min-p: 0.00
+        temp: 1.0
+        top-k: 64
+        top-p: 0.95
     - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
       settings:
         c: 131072
