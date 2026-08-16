@@ -30,7 +30,7 @@ inference_standalone:
         top-p: 0.95
     - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
       settings:
-        c: 131072
+        c: 262144
         hf-repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
         min-p: 0.00
         spec-draft-n-max: 2
