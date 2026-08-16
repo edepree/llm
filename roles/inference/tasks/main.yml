@@ -35,6 +35,8 @@
     device:
       - /dev/dri
       - /dev/kfd
+    env:
+      LLAMA_CACHE: "{{ inference_standalone.cache_path }}"
     group_add:
       - keep-groups
     state: quadlet
@@ -75,7 +77,7 @@
       - /dev/kfd
     group_add:
       - keep-groups
-    env: "{{ model.environment_variables | default({}) }}"
+    env: "{{ model.environment_variables | default({}) | combine({'LLAMA_CACHE': inference_llamacpp.cache_path}) }}"
     state: quadlet
     command: "{{ model.command }}"
     quadlet_options:

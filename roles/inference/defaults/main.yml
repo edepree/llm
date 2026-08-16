@@ -5,6 +5,9 @@ inference_standalone:
   models_max: 1
   cache_path: /root/.cache/huggingface/hub
   global_settings:
+    cache-type-k: q8_0
+    cache-type-v: q8_0
+    flash-attn: "on"
     n-gpu-layers: 999
     threads: 32
   presets:
@@ -32,8 +35,6 @@ inference_standalone:
         c: 262144
         hf-repo: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
         min-p: 0.00
-        spec-draft-n-max: 2
-        spec-type: draft-mtp
         temp: 1.0
         top-k: 20
         top-p: 0.95
