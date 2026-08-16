@@ -1,4 +1,21 @@
 ---
+inference_standalone:
+  name: llamacpp-server
+  port: 80
+  global_settings:
+    n-gpu-layers: 999
+    threads: 32
+  presets:
+    - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+      settings:
+        c: 131072
+        min-p: 0.00
+        spec-draft-n-max: 2
+        spec-type: draft-mtp
+        temp: 0.6
+        top-k: 20
+        top-p: 0.95
+
 inference_llamacpp:
   models:
     - name: llamacpp-inference-01

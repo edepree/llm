@@ -2,7 +2,9 @@
 - name: Deploy LLM Stack
   hosts: all
   become: true
-  # vars: no vars specified, using defaults
+  vars:
+    # Set via setup.sh prompt; running the playbook directly defaults to the modular stack
+    llm_stack_mode: "{{ llm_stack_mode | default('modular') }}"
 
   pre_tasks:
     - name: Verify target is Ubuntu/Debian
@@ -36,8 +38,12 @@
 
     - role: router
       tags: [router, bifrost]
-      when: router_enabled | default(true)
+      when:
+        - router_enabled | default(true)
+        - llm_stack_mode | default('modular') != 'standalone'
 
     - role: chat
       tags: [chat, openwebui]
-      when: chat_enabled | default(true)
+      when:
+        - chat_enabled | default(true)
+        - llm_stack_mode | default('modular') != 'standalone'

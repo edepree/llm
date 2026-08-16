@@ -1,6 +1,6 @@
 # LLM Stack
 
-A local LLM inference stack for Strix Halo deployed via Ansible on Ubuntu/Debian with AMD GPU (ROCm). Runs llama.cpp inference containers, a Bifrost model router, and Open WebUI chat frontend — all orchestrated through Podman systemd user services.
+A local LLM inference stack for Strix Halo deployed via Ansible on Ubuntu/Debian with AMD GPU (ROCm). Choose between a **standalone** llama.cpp server deployment or a **modular** deployment with separate llama.cpp inference containers, a Bifrost model router, and an Open WebUI chat frontend. Both are orchestrated through Podman systemd user services.
 
 ## Quick Start
 
@@ -15,8 +15,21 @@ A local LLM inference stack for Strix Halo deployed via Ansible on Ubuntu/Debian
 ```
 
 The setup script will prompt for:
-- **Target Endpoint** — hostname or IP of the target machine (default: `lisa.home.arpa`)
+- **Target Endpoint** — hostname or IP of the target machine (default: `host.example.com`)
+- **Deployment Mode** — `1` for standalone llama.cpp (default) or `2` for the modular stack
 - **Target User** — SSH user (default: `ubuntu`)
+
+### Standalone Mode
+
+A single llama.cpp server runs with a model preset `.ini` file, serving both the OpenAI-compatible API and the built-in chat Web UI:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| llama.cpp (standalone) | 80 | OpenAI-compatible API + built-in Web UI |
+
+Chat at `http://<target>` in your browser; the API is available at `http://<target>/v1`.
+
+### Modular Mode
 
 After deployment, the following services are available on the target host:
 
@@ -35,7 +48,10 @@ All containers run as systemd user services under the `llm` service account.
 ### Check Service Status
 
 ```bash
-# check a specific service
+# standalone mode
+systemctl --user status llamacpp-server.service
+
+# modular mode — check a specific service
 systemctl --user status llamacpp-inference-01.service
 systemctl --user status bifrost.service
 systemctl --user status openwebui.service
@@ -48,6 +64,7 @@ systemctl --user list-units --type=service
 
 ```bash
 # view logs for a specific service (follow mode)
+journalctl --user -u llamacpp-server.service -f
 journalctl --user -u llamacpp-inference-01.service -f
 journalctl --user -u bifrost.service -f
 journalctl --user -u openwebui.service -f
@@ -70,6 +87,36 @@ systemctl --user start llamacpp-inference-01.service
 ```
 
 ## Architecture
+
+### Standalone Mode
+
+```mermaid
+flowchart LR
+    subgraph Client
+        BROWSER["Browser / API Client"]
+    end
+
+    subgraph Inference
+        LLAMA["llama.cpp server\nport 80\nAPI + Web UI"]
+    end
+
+    subgraph GPU
+        ROCM["AMD GPU\n/dev/dri, /dev/kfd"]
+    end
+
+    BROWSER --> LLAMA
+    LLAMA --> ROCM
+```
+
+**Data flow:**
+1. Requests hit the single llama.cpp server on port 80
+2. The built-in router loads/unloads models according to the preset file and routes requests by model ID
+3. Inference runs on the AMD GPU via ROCm
+
+**Key components:**
+- **llama.cpp** — Runs as a single Podman quadlet container with `--models-preset` pointing at a generated `.ini` file; serves the OpenAI-compatible API and a built-in chat Web UI
+
+### Modular Mode
 
 ```mermaid
 flowchart LR
@@ -116,13 +163,39 @@ flowchart LR
 | `system-hardening` | `hardening`, `updates` | Unattended upgrades and reboot configuration |
 | `rocm` | `rocm`, `gpu` | ROCm memory configuration (TTM pages limit) |
 | `podman-setup` | `podman`, `infrastructure` | Creates the `artificial-intelligence` Podman network |
-| `inference` | `inference`, `llamacpp` | Deploys llama.cpp quadlet containers for each model |
-| `router` | `router`, `bifrost` | Deploys Bifrost router quadlet container with model routing config |
-| `chat` | `chat`, `openwebui` | Deploys Open WebUI quadlet container |
+| `inference` | `inference`, `llamacpp` | Standalone: single llama.cpp quadlet with model preset file. Modular: one quadlet container per model |
+| `router` | `router`, `bifrost` | Modular only: deploys Bifrost router quadlet container with model routing config |
+| `chat` | `chat`, `openwebui` | Modular only: deploys Open WebUI quadlet container |
 
 ## Configuration
 
-### Customizing Models
+### Deployment Mode
+
+The deployment mode is chosen at the `setup.sh` prompt and passed to the playbook as `llm_stack_mode` (`standalone` or `modular`). Running the playbook directly without this variable defaults to `modular`.
+
+> **Switching modes on an already-deployed host** does not remove the other mode's services. Stop and remove leftover quadlet units manually (e.g. `systemctl --user disable --now llamacpp-server` and delete the quadlet file under `~llm/.config/containers/systemd/`) if needed.
+
+### Standalone Model Presets
+
+The standalone server is configured through a model preset `.ini` file generated from `inference_standalone` in `roles/inference/defaults/main.yml`:
+
+```yaml
+inference_standalone:
+  name: llamacpp-server
+  port: 8080
+  global_settings: # shared defaults for all models ([*] section)
+    c: 131072
+    n-gpu-layers: 999
+  presets: # one section per model
+    - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+      settings:
+        temp: 0.6
+        top-p: 0.95
+```
+
+Keys correspond to llama.cpp CLI arguments without leading dashes (see the [llama.cpp model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Requests select a model by its ID (e.g. `unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`).
+
+### Customizing Models (modular mode)
 
 Edit `roles/inference/defaults/main.yml` to add or modify inference containers:
 
@@ -148,6 +221,7 @@ Bifrost config is generated from `roles/router/templates/router-config.json.j2` 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `inference_standalone.port` | `8080` | Standalone llama.cpp listening port |
 | `common_service_account.name` | `llm` | Service account for running containers |
 | `podman_network_name` | `artificial-intelligence` | Podman network name |
 | `router_bifrost.port` | `8080` | Bifrost listening port |
@@ -165,3 +239,5 @@ uv run ansible-playbook -i host, playbook.yml \
 ```
 
 Toggleable vars: `inference_enabled`, `router_enabled`, `chat_enabled`, `svc_account_enabled`, `sys_hardening_enable_updates`, `rocm_enabled`.
+
+The `llm_stack_mode` var (`standalone` / `modular`, default `modular`) additionally skips the router and chat roles in standalone mode.

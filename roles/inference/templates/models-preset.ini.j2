@@ -1,0 +1,13 @@
+version = 1
+
+[*]
+{% for key, value in inference_standalone.global_settings.items() %}
+{{ key }} = {{ value }}
+{% endfor %}
+{% for preset in inference_standalone.presets %}
+
+[{{ preset.section }}]
+{% for key, value in preset.settings.items() %}
+{{ key }} = {{ value }}
+{% endfor %}
+{% endfor %}

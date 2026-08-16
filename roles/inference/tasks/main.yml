@@ -1,4 +1,59 @@
 ---
+# standalone mode: single llama.cpp server with model presets
+- name: Create Configuration Directory for Standalone llama.cpp
+  ansible.builtin.file:
+    path: "/home/{{ common_service_account.name }}/.config/llamacpp"
+    state: directory
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0755"
+  when: llm_stack_mode | default('modular') == 'standalone'
+
+- name: Deploy Model Preset Configuration for Standalone llama.cpp
+  ansible.builtin.template:
+    src: templates/models-preset.ini.j2
+    dest: "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0644"
+  when: llm_stack_mode | default('modular') == 'standalone'
+  notify: Restart Standalone Inference Container
+
+- name: Deploy Quadlet for Standalone llama.cpp Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  containers.podman.podman_container:
+    name: "{{ inference_standalone.name }}"
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm
+    network:
+      - artificial-intelligence
+    publish:
+      - "{{ inference_standalone.port }}:8080/tcp"
+    volume:
+      - "{{ inference_standalone.name }}:/root/.cache/llama.cpp"
+      - "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini:/models-preset.ini:ro"
+    device:
+      - /dev/dri
+      - /dev/kfd
+    group_add:
+      - keep-groups
+    state: quadlet
+    command: --models-preset /models-preset.ini
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  when: llm_stack_mode | default('modular') == 'standalone'
+  notify: Restart Standalone Inference Container
+
+- name: Configure Standalone Inference Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ inference_standalone.port | string }}"
+    proto: tcp
+  when: llm_stack_mode | default('modular') == 'standalone'
+
+# modular mode: one llama.cpp container per model, fronted by the model router
 - name: Deploy Quadlet for Inference Container
   become: true
   become_user: "{{ common_service_account.name }}"
@@ -27,6 +82,7 @@
       - |
         [Install]
         WantedBy=default.target
+  when: llm_stack_mode | default('modular') != 'standalone'
   notify: Restart Inference Container
 
 - name: Configure Inference Container Firewall Rules
@@ -35,3 +91,4 @@
     port: "{{ item.port | string }}"
     proto: tcp
   loop: "{{ inference_llamacpp.models }}"
+  when: llm_stack_mode | default('modular') != 'standalone'
