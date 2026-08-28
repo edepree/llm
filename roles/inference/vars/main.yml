@@ -1,1 +1,4 @@
 ---
+# handler that restarts whichever standalone server this mode runs
+inference_standalone_restart_handler: >-
+  {{ 'Restart Standalone Inference Bare Metal' if llm_stack_mode == 'standalone-bare-metal' else 'Restart Standalone Inference Container' }}

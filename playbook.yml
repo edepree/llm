@@ -28,14 +28,15 @@
 
     - role: podman-setup
       tags: [podman, infrastructure]
+      when: llm_stack_mode != 'standalone-bare-metal'
 
     - role: inference
       tags: [inference, llamacpp]
 
     - role: router
       tags: [router, bifrost]
-      when: llm_stack_mode != 'standalone'
+      when: llm_stack_mode == 'modular'
 
     - role: chat
       tags: [chat, openwebui]
-      when: llm_stack_mode != 'standalone'
+      when: llm_stack_mode == 'modular'

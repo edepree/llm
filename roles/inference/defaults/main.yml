@@ -2,7 +2,11 @@
 inference_standalone:
   name: llamacpp-server
   port: 80
+  host: 0.0.0.0
   models_max: 1
+  # vendor installer (bare metal mode); installs to ~/.local/bin/llama of the user it runs as
+  install_url: https://llama.app/install.sh
+  install_repo_url: https://huggingface.co/buckets/ggml-org/install.sh/resolve
   cache_path: /root/.cache/huggingface/hub
   global_settings:
     cache-type-k: q8_0
