@@ -74,6 +74,15 @@
     - llama_latest_release.content | trim | regex_replace('^b', '') not in llama_installed_version.stdout
   notify: "{{ inference_standalone_restart_handler }}"
 
+- name: Create Systemd User Unit Directory for Standalone llama.cpp
+  ansible.builtin.file:
+    path: "/home/{{ common_service_account.name }}/.config/systemd/user"
+    state: directory
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0755"
+  when: llm_stack_mode == 'standalone-bare-metal'
+
 - name: Deploy Systemd User Service for Standalone llama.cpp
   ansible.builtin.template:
     src: templates/llamacpp-server.service.j2
