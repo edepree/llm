@@ -9,29 +9,26 @@ inference_standalone:
   install_repo_url: https://huggingface.co/buckets/ggml-org/install.sh/resolve
   cache_path: /root/.cache/huggingface/hub
   global_settings:
-    cache-type-k: q8_0
-    cache-type-v: q8_0
     flash-attn: "on"
     n-gpu-layers: 999
     threads: 32
   presets:
-    - section: unsloth/gpt-oss-20b-GGUF:UD-Q8_K_XL
+    - section: unsloth/gpt-oss-20b-GGUF:F16
       settings:
         c: 131072
-        hf-repo: unsloth/gpt-oss-20b-GGUF:UD-Q8_K_XL
-        load-on-startup: "true"
+        hf-repo: unsloth/gpt-oss-20b-GGUF:F16
         min-p: 0.00
         temp: 1.0
         top-k: 0
         top-p: 1.0
-    - section: unsloth/Muse-Glimmer-30B-GGUF:UD-Q8_K_XL
+    - section: unsloth/gpt-oss-120b-GGUF:F16
       settings:
-        c: 262144
-        hf-repo: unsloth/Muse-Glimmer-30B-GGUF:UD-Q8_K_XL
+        c: 131072
+        hf-repo: unsloth/gpt-oss-120b-GGUF:F16
         min-p: 0.00
         temp: 1.0
-        top-k: 64
-        top-p: 0.95
+        top-k: 0
+        top-p: 1.0
     - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
       settings:
         c: 262144

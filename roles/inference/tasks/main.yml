@@ -48,6 +48,7 @@
 - name: Check Latest llama.cpp Release
   ansible.builtin.uri:
     url: "{{ inference_standalone.install_repo_url }}/latest"
+    return_content: true
   register: llama_latest_release
   failed_when: llama_latest_release.status != 200
   when: llm_stack_mode == 'standalone-bare-metal'
