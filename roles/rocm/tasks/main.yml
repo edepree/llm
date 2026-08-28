@@ -1,5 +1,5 @@
 ---
-- name: Install ROCm Packages
+- name: Install ROCm Packages (Ubuntu Native)
   ansible.builtin.apt:
     name:
       - rocm
@@ -7,6 +7,32 @@
     autoclean: true
     autoremove: true
     update_cache: true
+  when: not rocm_install_from_amd_repo | default(false)
+
+- name: Install ROCm Packages (AMD Repository)
+  when: rocm_install_from_amd_repo | default(false)
+  block:
+    - name: Install Prerequisite Packages
+      ansible.builtin.apt:
+        name:
+          - libatomic1
+          - libquadmath0
+        update_cache: true
+
+    - name: Add AMD ROCm Repository
+      ansible.builtin.deb822_repository:
+        name: amdrocm-stable
+        types: [deb]
+        uris: https://stable.repo.amd.com/rocm/core/packages/ubuntu2604/
+        suites: [stable]
+        components: [main]
+        architectures: [amd64]
+        signed_by: https://stable.repo.amd.com/rocm/gpg/packages.gpg
+
+    - name: Install AMD ROCm Package
+      ansible.builtin.apt:
+        name: amdrocm10.0-gfx1151
+        update_cache: true
 
 - name: Set TTM Pages Limits
   ansible.builtin.copy:
