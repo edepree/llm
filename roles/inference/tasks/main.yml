@@ -19,60 +19,139 @@
   when: llm_stack_mode in ['standalone-bare-metal', 'standalone-podman']
   notify: "{{ inference_standalone_restart_handler }}"
 
-# standalone bare metal: vendor-installed llama binary running as a systemd user service
-- name: Install Curl for llama.cpp Vendor Installer
+# standalone bare metal: llama.cpp built from source, installed system-wide
+- name: Install Build Dependencies
+  become: true
   ansible.builtin.apt:
-    name: curl
+    name:
+      - build-essential
+      - clang
+      - cmake
+      - curl
+      - git
+      - libcurl4-openssl-dev
+      - lld
+      - ninja-build
+      - pkg-config
+      - python3
+    state: present
+    update_cache: true
+  when: llm_stack_mode == 'standalone-bare-metal'
+
+- name: Install ROCm Development Packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ inference_standalone.rocm_dev_packages }}"
     state: present
   when: llm_stack_mode == 'standalone-bare-metal'
 
-- name: Install llama.cpp via Vendor Installer
-  ansible.builtin.shell: |
-    set -o pipefail
-    curl -LsSf {{ inference_standalone.install_url }} | sh
-  args:
-    creates: "/home/{{ common_service_account.name }}/.local/bin/llama"
+- name: Create llama.cpp Source Directory
   become: true
-  become_user: "{{ common_service_account.name }}"
+  ansible.builtin.file:
+    path: "{{ inference_standalone.build_dir | dirname }}"
+    state: directory
+    mode: "0755"
   when: llm_stack_mode == 'standalone-bare-metal'
 
-- name: Check Installed llama.cpp Version
-  ansible.builtin.command: "/home/{{ common_service_account.name }}/.local/bin/llama version"
+- name: Fetch llama.cpp Source
   become: true
-  become_user: "{{ common_service_account.name }}"
-  register: llama_installed_version
-  changed_when: false
-  failed_when: false
+  ansible.builtin.git:
+    repo: "{{ inference_standalone.source_repo }}"
+    dest: "{{ inference_standalone.build_dir }}"
+    version: "{{ inference_standalone.source_ref }}"
+    update: true
+    force: true
+  register: llamacpp_source_fetch
+  notify: "{{ inference_standalone_restart_handler }}"
   when: llm_stack_mode == 'standalone-bare-metal'
 
-- name: Check Latest llama.cpp Release
-  ansible.builtin.uri:
-    url: "{{ inference_standalone.install_repo_url }}/latest"
-    return_content: true
-  register: llama_latest_release
-  failed_when: llama_latest_release.status != 200
+- name: Check Installed llama-server Binary
+  become: true
+  ansible.builtin.stat:
+    path: "{{ inference_standalone.install_bin_dir }}/llama-server"
+  register: llamacpp_installed_binary
   when: llm_stack_mode == 'standalone-bare-metal'
 
-- name: Reinstall llama.cpp (binary missing or failing)
-  ansible.builtin.shell: |
-    set -o pipefail
-    curl -LsSf {{ inference_standalone.install_url }} | sh
+- name: Build and Install llama.cpp from Source
   become: true
-  become_user: "{{ common_service_account.name }}"
+  environment:
+    ROCM_PATH: "{{ inference_standalone.rocm_path }}"
+    HIP_PATH: "{{ inference_standalone.rocm_path }}"
+    HIP_PLATFORM: amd
+    HIP_CLANG_PATH: "{{ inference_standalone.rocm_path }}/lib/llvm/bin"
+    PATH: >-
+      {{ inference_standalone.rocm_path }}/bin:{{ inference_standalone.rocm_path }}/lib/llvm/bin:{{
+      ansible_facts['ansible_env']['PATH'] }}
   when:
     - llm_stack_mode == 'standalone-bare-metal'
-    - llama_installed_version.rc != 0
-  notify: "{{ inference_standalone_restart_handler }}"
+    - llamacpp_source_fetch.changed or not llamacpp_installed_binary.stat.exists
+  block:
+    # ROCm's own clang (found via hipconfig) is the only compiler that can see the
+    # amdgcn device library; the distro clang++ configured fine but failed the HIP test.
+    - name: Clean llama.cpp Build Directory
+      ansible.builtin.file:
+        path: "{{ inference_standalone.build_dir }}/build"
+        state: absent
 
-- name: Update llama.cpp
-  ansible.builtin.command: "/home/{{ common_service_account.name }}/.local/bin/llama update"
-  become: true
-  become_user: "{{ common_service_account.name }}"
-  when:
-    - llm_stack_mode == 'standalone-bare-metal'
-    - llama_installed_version.rc == 0
-    - llama_latest_release.content | trim | regex_replace('^b', '') not in llama_installed_version.stdout
-  notify: "{{ inference_standalone_restart_handler }}"
+    - name: Configure llama.cpp Build
+      ansible.builtin.shell: |
+        HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" cmake -S . -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DGGML_HIP=ON \
+          -DGPU_TARGETS={{ inference_standalone.gpu_target }} \
+          -DGGML_HIP_ROCWMMA_FATTN=ON \
+          -DGGML_HIP_NO_VMM=ON \
+          -DGGML_HIP_MMQ_MFMA=ON
+      args:
+        chdir: "{{ inference_standalone.build_dir }}"
+
+    - name: Compile llama.cpp
+      ansible.builtin.command: |
+        cmake --build build -j {{ inference_standalone.build_jobs }}
+      args:
+        chdir: "{{ inference_standalone.build_dir }}"
+
+    - name: Install llama.cpp Binaries
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ inference_standalone.build_dir }}/build/bin/{{ item }}"
+        dest: "{{ inference_standalone.install_bin_dir }}/{{ item }}"
+        mode: "0755"
+      loop:
+        - llama-cli
+        - llama-server
+
+    - name: Create llama.cpp Library Directory
+      ansible.builtin.file:
+        path: "{{ inference_standalone.install_lib_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Find llama.cpp Shared Libraries
+      ansible.builtin.find:
+        paths: "{{ inference_standalone.build_dir }}/build/bin"
+        patterns: "*.so*"
+      register: llamacpp_shared_libs
+
+    - name: Install llama.cpp Shared Libraries
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ item.path }}"
+        dest: "{{ inference_standalone.install_lib_dir }}/{{ item.path | basename }}"
+        mode: "0755"
+      loop: "{{ llamacpp_shared_libs.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Deploy llama.cpp Dynamic Linker Configuration
+      ansible.builtin.template:
+        src: templates/llamacpp-ld.so.conf.j2
+        dest: /etc/ld.so.conf.d/llamacpp.conf
+        mode: "0644"
+
+    - name: Refresh Shared Library Cache
+      ansible.builtin.command: ldconfig
+      notify: "{{ inference_standalone_restart_handler }}"
 
 - name: Create Systemd User Unit Directory for Standalone llama.cpp
   ansible.builtin.file:

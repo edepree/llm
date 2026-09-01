@@ -4,9 +4,18 @@ inference_standalone:
   port: 80
   host: 0.0.0.0
   models_max: 1
-  # vendor installer (bare metal mode); installs to ~/.local/bin/llama of the user it runs as
-  install_url: https://llama.app/install.sh
-  install_repo_url: https://huggingface.co/buckets/ggml-org/install.sh/resolve
+  # source build (bare metal mode); ref is a git branch, tag, or commit
+  source_repo: https://github.com/ggml-org/llama.cpp.git
+  source_ref: master
+  build_dir: /opt/llama-src/llama.cpp
+  install_bin_dir: /usr/local/bin
+  install_lib_dir: /usr/local/lib/llama.cpp
+  rocm_path: /opt/rocm/core-10.0
+  gpu_target: gfx1151
+  rocm_dev_packages:
+    - amdrocm-core-dev10.0-gfx1151
+    - librocwmma-dev
+  build_jobs: "{{ ansible_processor_vcpus | default(8) }}"
   cache_path: /root/.cache/huggingface/hub
   global_settings:
     flash-attn: "on"
@@ -44,6 +53,19 @@ inference_standalone:
         c: 262144
         hf-repo: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
         min-p: 0.00
+        reasoning-preserve: "true"
+        spec-default: "true"
+        spec-draft-n-max: 2
+        spec-type: draft-mtp
+        temp: 1.0
+        top-k: 20
+        top-p: 0.95
+    - section: unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL
+      settings:
+        c: 262144
+        hf-repo: unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL
+        min-p: 0.00
+        presence-penalty: 0.0
         reasoning-preserve: "true"
         spec-default: "true"
         spec-draft-n-max: 2

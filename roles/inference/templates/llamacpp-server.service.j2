@@ -3,7 +3,7 @@ Description=llama.cpp standalone server
 After=network.target
 
 [Service]
-ExecStart=/home/{{ common_service_account.name }}/.local/bin/llama server \
+ExecStart={{ inference_standalone.install_bin_dir }}/llama-server \
   --models-preset /home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini \
   --models-max {{ inference_standalone.models_max }} \
   --host {{ inference_standalone.host }} \
