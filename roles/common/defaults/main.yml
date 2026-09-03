@@ -4,9 +4,6 @@ common_packages:
   - podman
   - ufw
 
-common_sysctl:
-  net.ipv4.ip_unprivileged_port_start: 80
-
 common_journald_maxuse: 1G
 
 common_service_account:

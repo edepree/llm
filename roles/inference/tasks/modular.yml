@@ -11,7 +11,7 @@
     name: "{{ model.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     network:
-      - artificial-intelligence
+      - "{{ podman_setup_network_name }}"
     publish:
       - "{{ model.port }}:8080/tcp"
     volume:

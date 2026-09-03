@@ -19,7 +19,6 @@
     sysctl_set: true
     reload: true
     sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
-  notify: Reload Sysctl
 
 - name: Ensure journald.conf.d Directory
   ansible.builtin.file:

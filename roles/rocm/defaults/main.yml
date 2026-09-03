@@ -1,3 +1,2 @@
 ---
-rocm_ttm_pages_limit: 26214400
-rocm_install_from_amd_repo: true
+rocm_ttm_pages_limit: 28835840 # 110 GiB

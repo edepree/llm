@@ -1,24 +1,6 @@
 ---
 # standalone bare metal: llama.cpp built from source, installed system-wide
-- name: Create Configuration Directory for Standalone llama.cpp
-  ansible.builtin.file:
-    path: "/home/{{ common_service_account.name }}/.config/llamacpp"
-    state: directory
-    owner: "{{ common_service_account.name }}"
-    group: "{{ common_service_account.name }}"
-    mode: "0755"
-
-- name: Deploy Model Preset Configuration for Standalone llama.cpp
-  ansible.builtin.template:
-    src: templates/models-preset.ini.j2
-    dest: "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini"
-    owner: "{{ common_service_account.name }}"
-    group: "{{ common_service_account.name }}"
-    mode: "0644"
-  notify: Restart Standalone Inference
-
 - name: Install Build Dependencies
-  become: true
   ansible.builtin.apt:
     name:
       - build-essential
@@ -35,20 +17,17 @@
     update_cache: true
 
 - name: Install ROCm Development Packages
-  become: true
   ansible.builtin.apt:
     name: "{{ inference_standalone.rocm_dev_packages }}"
     state: present
 
 - name: Create llama.cpp Source Directory
-  become: true
   ansible.builtin.file:
     path: "{{ inference_standalone.build_dir | dirname }}"
     state: directory
     mode: "0755"
 
 - name: Fetch llama.cpp Source
-  become: true
   ansible.builtin.git:
     repo: "{{ inference_standalone.source_repo }}"
     dest: "{{ inference_standalone.build_dir }}"
@@ -65,7 +44,6 @@
   register: inference_installed_binary
 
 - name: Build and Install llama.cpp from Source
-  become: true
   environment:
     ROCM_PATH: "{{ inference_standalone.rocm_path }}"
     HIP_PATH: "{{ inference_standalone.rocm_path }}"
@@ -170,9 +148,3 @@
     daemon_reload: true
     enabled: true
     state: started
-
-- name: Configure Standalone Inference Firewall Rules
-  community.general.ufw:
-    rule: allow
-    port: "{{ inference_standalone.port | string }}"
-    proto: tcp

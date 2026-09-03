@@ -6,4 +6,4 @@
     name: "{{ router_bifrost.name }}.service"
     scope: user
     daemon_reload: true
-    state: started
+    state: restarted

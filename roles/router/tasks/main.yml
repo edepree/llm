@@ -22,7 +22,7 @@
     name: "{{ router_bifrost.name }}"
     image: docker.io/maximhq/bifrost
     network:
-      - artificial-intelligence
+      - "{{ podman_setup_network_name }}"
     publish:
       - "{{ router_bifrost.port }}:8080/tcp"
     volume:

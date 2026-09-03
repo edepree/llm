@@ -1,11 +1,37 @@
 ---
-- name: Include Standalone Bare Metal Tasks
-  ansible.builtin.include_tasks: standalone-bare-metal.yml
-  when: llm_stack_mode == 'standalone-bare-metal'
+- name: Standalone llama.cpp
+  when: llm_stack_mode != 'modular'
+  block:
+    - name: Create Configuration Directory for Standalone llama.cpp
+      ansible.builtin.file:
+        path: "/home/{{ common_service_account.name }}/.config/llamacpp"
+        state: directory
+        owner: "{{ common_service_account.name }}"
+        group: "{{ common_service_account.name }}"
+        mode: "0755"
 
-- name: Include Standalone Podman Tasks
-  ansible.builtin.include_tasks: standalone-podman.yml
-  when: llm_stack_mode == 'standalone-podman'
+    - name: Deploy Model Preset Configuration for Standalone llama.cpp
+      ansible.builtin.template:
+        src: templates/models-preset.ini.j2
+        dest: "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini"
+        owner: "{{ common_service_account.name }}"
+        group: "{{ common_service_account.name }}"
+        mode: "0644"
+      notify: Restart Standalone Inference
+
+    - name: Include Bare Metal Tasks
+      ansible.builtin.include_tasks: standalone-bare-metal.yml
+      when: llm_stack_mode == 'standalone-bare-metal'
+
+    - name: Include Podman Tasks
+      ansible.builtin.include_tasks: standalone-podman.yml
+      when: llm_stack_mode == 'standalone-podman'
+
+    - name: Configure Standalone Inference Firewall Rules
+      community.general.ufw:
+        rule: allow
+        port: "{{ inference_standalone.port | string }}"
+        proto: tcp
 
 - name: Include Modular Tasks
   ansible.builtin.include_tasks: modular.yml

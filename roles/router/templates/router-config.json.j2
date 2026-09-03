@@ -5,7 +5,7 @@
   },
   "providers": {
 {% for model in inference_llamacpp.models -%}
-    "{{ model.name | replace(' ', '-') }}": {
+    "{{ model.name }}": {
       "custom_provider_config": {
         "allowed_requests": {
           "chat_completion": true,
@@ -24,7 +24,7 @@
       },
       "network_config": {
         "allow_private_network": true,
-        "base_url": "http://{{ model.name | replace(' ', '-') }}:8080"
+        "base_url": "http://{{ model.name }}:8080"
       }
     }{% if not loop.last %},{% endif %}
 {% endfor -%}

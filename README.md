@@ -1,6 +1,6 @@
 # LLM Stack
 
-A local LLM inference stack for Strix Halo deployed via Ansible on Ubuntu/Debian with AMD GPU (ROCm). Choose between a **standalone** llama.cpp server deployment or a **modular** deployment with separate llama.cpp inference containers, a Bifrost model router, and an Open WebUI chat frontend. Both are orchestrated through Podman systemd user services.
+A local LLM inference stack for Strix Halo deployed via Ansible on Ubuntu/Debian with AMD GPU (ROCm). Choose between a **standalone** llama.cpp server — built from source on the host or run as a Podman container — or a **modular** deployment with separate llama.cpp inference containers, a Bifrost model router, and an Open WebUI chat frontend. Everything runs as a systemd user service under the `llm` account.
 
 ## Quick Start
 
@@ -16,12 +16,12 @@ A local LLM inference stack for Strix Halo deployed via Ansible on Ubuntu/Debian
 
 The setup script will prompt for:
 - **Target Endpoint** — hostname or IP of the target machine (default: `host.example.com`)
-- **Deployment Mode** — `1` for standalone llama.cpp (default) or `2` for the modular stack
+- **Deployment Mode** — `1` for standalone llama.cpp on bare metal (default), `2` for standalone llama.cpp in Podman, `3` for the modular stack
 - **Target User** — SSH user (default: `ubuntu`)
 
 ### Standalone Mode
 
-A single llama.cpp server runs with a model preset `.ini` file, serving both the OpenAI-compatible API and the built-in chat Web UI:
+A single llama.cpp server runs with a model preset `.ini` file, serving both the OpenAI-compatible API and the built-in chat Web UI. Bare-metal mode compiles llama.cpp from source for your GPU and runs the binary as a systemd user service; Podman mode runs the upstream ROCm image as a quadlet container.
 
 | Service | Port | Description |
 |---------|------|-------------|
@@ -47,7 +47,7 @@ After deployment, the following services are available on the target host:
 
 ## Managing the Stack
 
-All containers run as systemd user services under the `llm` service account.
+All services run as systemd user units under the `llm` account (containers as Podman quadlets).
 
 ### Check Service Status
 
@@ -118,7 +118,7 @@ flowchart LR
 3. Inference runs on the AMD GPU via ROCm
 
 **Key components:**
-- **llama.cpp** — Runs as a single Podman quadlet container with `--models-preset` pointing at a generated `.ini` file; serves the OpenAI-compatible API and a built-in chat Web UI
+- **llama.cpp** — One server started with `--models-preset` pointing at a generated `.ini` file; serves the OpenAI-compatible API and a built-in chat Web UI. Bare-metal mode builds it from source (ROCm/HIP via `hipconfig`) and installs `llama-server` + libraries under `/usr/local`; Podman mode runs `ghcr.io/ggml-org/llama.cpp:server-rocm` as a quadlet container
 
 ### Modular Mode
 
@@ -165,9 +165,9 @@ flowchart LR
 | `common` | `common`, `system` | OS updates, packages (podman, ufw), sysctl, journald limits, base firewall |
 | `service_account` | `accounts` | Creates the `llm` user with GPU access groups, enables systemd lingering |
 | `system_hardening` | `hardening`, `updates` | Unattended upgrades and reboot configuration |
-| `rocm` | `rocm`, `gpu` | ROCm memory configuration (TTM pages limit) |
+| `rocm` | `rocm`, `gpu` | Installs ROCm from the AMD repository and sets the TTM pages memory limit |
 | `podman_setup` | `podman`, `infrastructure` | Creates the `artificial-intelligence` Podman network |
-| `inference` | `inference`, `llamacpp` | Standalone: single llama.cpp quadlet with model preset file. Modular: one quadlet container per model |
+| `inference` | `inference`, `llamacpp` | Standalone: single llama.cpp server with a model preset file, built from source (bare metal) or as a quadlet container (Podman). Modular: one quadlet container per model |
 | `router` | `router`, `bifrost` | Modular only: deploys Bifrost router quadlet container with model routing config |
 | `chat` | `chat`, `openwebui` | Modular only: deploys Open WebUI quadlet container |
 
@@ -175,9 +175,11 @@ flowchart LR
 
 ### Deployment Mode
 
-The deployment mode is chosen at the `setup.sh` prompt and passed to the playbook as `llm_stack_mode` (`standalone` or `modular`). Running the playbook directly without this variable defaults to `modular`.
+The deployment mode is chosen at the `setup.sh` prompt and passed to the playbook as `llm_stack_mode`: `standalone-bare-metal`, `standalone-podman` or `modular`. Running the playbook directly without this variable defaults to `modular`.
 
-> **Switching modes on an already-deployed host** does not remove the other mode's services. Stop and remove leftover quadlet units manually (e.g. `systemctl --user disable --now llamacpp-server` and delete the quadlet file under `~llm/.config/containers/systemd/`) if needed.
+The mode gates the roles: `podman_setup` is skipped in bare-metal mode, and `router` and `chat` run only in modular mode. There are no per-component toggles.
+
+> **Switching modes on an already-deployed host** does not remove the other mode's services. Stop and disable leftover units manually (e.g. `systemctl --user disable --now llamacpp-server.service` and delete its quadlet file under `~llm/.config/containers/systemd/`) if needed.
 
 ### Standalone Model Presets
 
@@ -188,7 +190,7 @@ inference_standalone:
   name: llamacpp-server
   port: 80
   models_max: 1 # max models resident at once; excess are unloaded LRU-style
-  cache_path: /root/.cache/huggingface/hub # model cache, backed by a named volume
+  cache_path: /root/.cache/huggingface/hub # passed as LLAMA_CACHE in Podman mode; bare metal uses llama-server's default cache dir
   global_settings: # shared defaults for all models ([*] section)
     n-gpu-layers: 999
     threads: 32
@@ -235,22 +237,10 @@ Bifrost config is generated from `roles/router/templates/router-config.json.j2` 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `inference_standalone.port` | `80` | Standalone llama.cpp listening port |
-| `common_service_account.name` | `llm` | Service account for running containers |
+| `common_service_account.name` | `llm` | Service account that runs the inference services |
 | `podman_setup_network_name` | `artificial-intelligence` | Podman network name |
 | `router_bifrost.port` | `8080` | Bifrost listening port |
 | `chat_openwebui.port` | `80` | Open WebUI listening port |
 | `rocm_ttm_pages_limit` | `26214400` | ROCm TTM memory limit in pages |
-| `system_hardening_enable_updates` | `true` | Enable unattended upgrades |
-
-### Conditional Deployment
-
-Individual components can be disabled:
-
-```bash
-uv run ansible-playbook -i host, playbook.yml \
-  --extra-vars "inference_enabled=false router_enabled=false"
-```
-
-Toggleable vars: `inference_enabled`, `router_enabled`, `chat_enabled`, `svc_account_enabled`, `system_hardening_enable_updates`, `rocm_enabled`.
-
-The `llm_stack_mode` var (`standalone` / `modular`, default `modular`) additionally skips the router and chat roles in standalone mode.
+| `system_hardening_unattended_reboot` | `false` | Reboot automatically after unattended upgrades |
+| `inference_standalone.source_ref` | `master` | llama.cpp git branch, tag or commit built in bare-metal mode |

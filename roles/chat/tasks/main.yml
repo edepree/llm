@@ -6,7 +6,7 @@
     name: "{{ chat_openwebui.name }}"
     image: ghcr.io/open-webui/open-webui:latest
     network:
-      - artificial-intelligence
+      - "{{ podman_setup_network_name }}"
     publish:
       - "{{ chat_openwebui.port }}:8080/tcp"
     volume:
