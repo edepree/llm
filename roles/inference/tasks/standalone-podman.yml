@@ -1,0 +1,52 @@
+---
+# standalone mode: single llama.cpp server with model presets, in a container
+- name: Create Configuration Directory for Standalone llama.cpp
+  ansible.builtin.file:
+    path: "/home/{{ common_service_account.name }}/.config/llamacpp"
+    state: directory
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0755"
+
+- name: Deploy Model Preset Configuration for Standalone llama.cpp
+  ansible.builtin.template:
+    src: templates/models-preset.ini.j2
+    dest: "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0644"
+  notify: Restart Standalone Inference
+
+- name: Deploy Quadlet for Standalone llama.cpp Container
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  containers.podman.podman_container:
+    name: "{{ inference_standalone.name }}"
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm
+    network:
+      - artificial-intelligence
+    publish:
+      - "{{ inference_standalone.port }}:8080/tcp"
+    volume:
+      - "{{ inference_standalone.name }}:{{ inference_standalone.cache_path }}"
+      - "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini:/models-preset.ini:ro"
+    device:
+      - /dev/dri
+      - /dev/kfd
+    env:
+      LLAMA_CACHE: "{{ inference_standalone.cache_path }}"
+    group_add:
+      - keep-groups
+    state: quadlet
+    command: --models-preset /models-preset.ini --models-max {{ inference_standalone.models_max }}
+    quadlet_options:
+      - |
+        [Install]
+        WantedBy=default.target
+  notify: Restart Standalone Inference
+
+- name: Configure Standalone Inference Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ inference_standalone.port | string }}"
+    proto: tcp

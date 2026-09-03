@@ -17,16 +17,16 @@
     - role: common
       tags: [common, system]
 
-    - role: service-account
+    - role: service_account
       tags: [accounts]
 
-    - role: system-hardening
+    - role: system_hardening
       tags: [hardening, updates]
 
     - role: rocm
       tags: [rocm, gpu]
 
-    - role: podman-setup
+    - role: podman_setup
       tags: [podman, infrastructure]
       when: llm_stack_mode != 'standalone-bare-metal'
 

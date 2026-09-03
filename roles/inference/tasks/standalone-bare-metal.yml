@@ -1,0 +1,178 @@
+---
+# standalone bare metal: llama.cpp built from source, installed system-wide
+- name: Create Configuration Directory for Standalone llama.cpp
+  ansible.builtin.file:
+    path: "/home/{{ common_service_account.name }}/.config/llamacpp"
+    state: directory
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0755"
+
+- name: Deploy Model Preset Configuration for Standalone llama.cpp
+  ansible.builtin.template:
+    src: templates/models-preset.ini.j2
+    dest: "/home/{{ common_service_account.name }}/.config/llamacpp/models-preset.ini"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0644"
+  notify: Restart Standalone Inference
+
+- name: Install Build Dependencies
+  become: true
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - clang
+      - cmake
+      - curl
+      - git
+      - libcurl4-openssl-dev
+      - lld
+      - ninja-build
+      - pkg-config
+      - python3
+    state: present
+    update_cache: true
+
+- name: Install ROCm Development Packages
+  become: true
+  ansible.builtin.apt:
+    name: "{{ inference_standalone.rocm_dev_packages }}"
+    state: present
+
+- name: Create llama.cpp Source Directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ inference_standalone.build_dir | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Fetch llama.cpp Source
+  become: true
+  ansible.builtin.git:
+    repo: "{{ inference_standalone.source_repo }}"
+    dest: "{{ inference_standalone.build_dir }}"
+    version: "{{ inference_standalone.source_ref }}"
+    update: true
+    force: true
+  register: inference_source_fetch
+  notify: Restart Standalone Inference
+
+- name: Check Installed llama-server Binary
+  become: true
+  ansible.builtin.stat:
+    path: "{{ inference_standalone.install_bin_dir }}/llama-server"
+  register: inference_installed_binary
+
+- name: Build and Install llama.cpp from Source
+  become: true
+  environment:
+    ROCM_PATH: "{{ inference_standalone.rocm_path }}"
+    HIP_PATH: "{{ inference_standalone.rocm_path }}"
+    HIP_PLATFORM: amd
+    HIP_CLANG_PATH: "{{ inference_standalone.rocm_path }}/lib/llvm/bin"
+    PATH: >-
+      {{ inference_standalone.rocm_path }}/bin:{{ inference_standalone.rocm_path }}/lib/llvm/bin:{{
+      ansible_facts['ansible_env']['PATH'] }}
+  when: inference_source_fetch.changed or not inference_installed_binary.stat.exists
+  block:
+    - name: Clean llama.cpp Build Directory
+      ansible.builtin.file:
+        path: "{{ inference_standalone.build_dir }}/build"
+        state: absent
+
+    - name: Configure llama.cpp Build
+      ansible.builtin.shell: |
+        HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" cmake -S . -B build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DGGML_HIP=ON \
+          -DGPU_TARGETS={{ inference_standalone.gpu_target }} \
+          -DGGML_HIP_ROCWMMA_FATTN=ON \
+          -DGGML_HIP_NO_VMM=ON \
+          -DGGML_HIP_MMQ_MFMA=ON
+      args:
+        chdir: "{{ inference_standalone.build_dir }}"
+        creates: "{{ inference_standalone.build_dir }}/build/CMakeCache.txt"
+
+    - name: Compile llama.cpp
+      ansible.builtin.command: |
+        cmake --build build -j {{ inference_standalone.build_jobs }}
+      args:
+        chdir: "{{ inference_standalone.build_dir }}"
+        creates: "{{ inference_standalone.build_dir }}/build/bin/llama-server"
+
+    - name: Install llama.cpp Binaries
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ inference_standalone.build_dir }}/build/bin/{{ item }}"
+        dest: "{{ inference_standalone.install_bin_dir }}/{{ item }}"
+        mode: "0755"
+      loop:
+        - llama-cli
+        - llama-server
+
+    - name: Create llama.cpp Library Directory
+      ansible.builtin.file:
+        path: "{{ inference_standalone.install_lib_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Find llama.cpp Shared Libraries
+      ansible.builtin.find:
+        paths: "{{ inference_standalone.build_dir }}/build/bin"
+        patterns: "*.so*"
+      register: inference_shared_libs
+
+    - name: Install llama.cpp Shared Libraries
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ item.path }}"
+        dest: "{{ inference_standalone.install_lib_dir }}/{{ item.path | basename }}"
+        mode: "0755"
+      loop: "{{ inference_shared_libs.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+    - name: Deploy llama.cpp Dynamic Linker Configuration
+      ansible.builtin.template:
+        src: templates/llamacpp-ld.so.conf.j2
+        dest: /etc/ld.so.conf.d/llamacpp.conf
+        mode: "0644"
+
+    - name: Refresh Shared Library Cache
+      ansible.builtin.command: ldconfig
+      changed_when: true
+      notify: Restart Standalone Inference
+
+- name: Create Systemd User Unit Directory for Standalone llama.cpp
+  ansible.builtin.file:
+    path: "/home/{{ common_service_account.name }}/.config/systemd/user"
+    state: directory
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0755"
+
+- name: Deploy Systemd User Service for Standalone llama.cpp
+  ansible.builtin.template:
+    src: templates/llamacpp-server.service.j2
+    dest: "/home/{{ common_service_account.name }}/.config/systemd/user/{{ inference_standalone.name }}.service"
+    owner: "{{ common_service_account.name }}"
+    group: "{{ common_service_account.name }}"
+    mode: "0644"
+  notify: Restart Standalone Inference
+
+- name: Enable and Start Standalone llama.cpp Service
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  ansible.builtin.systemd:
+    name: "{{ inference_standalone.name }}.service"
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Configure Standalone Inference Firewall Rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ inference_standalone.port | string }}"
+    proto: tcp

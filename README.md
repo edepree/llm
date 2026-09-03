@@ -163,10 +163,10 @@ flowchart LR
 | Role | Tags | Purpose |
 |------|------|---------|
 | `common` | `common`, `system` | OS updates, packages (podman, ufw), sysctl, journald limits, base firewall |
-| `service-account` | `accounts` | Creates the `llm` user with GPU access groups, enables systemd lingering |
-| `system-hardening` | `hardening`, `updates` | Unattended upgrades and reboot configuration |
+| `service_account` | `accounts` | Creates the `llm` user with GPU access groups, enables systemd lingering |
+| `system_hardening` | `hardening`, `updates` | Unattended upgrades and reboot configuration |
 | `rocm` | `rocm`, `gpu` | ROCm memory configuration (TTM pages limit) |
-| `podman-setup` | `podman`, `infrastructure` | Creates the `artificial-intelligence` Podman network |
+| `podman_setup` | `podman`, `infrastructure` | Creates the `artificial-intelligence` Podman network |
 | `inference` | `inference`, `llamacpp` | Standalone: single llama.cpp quadlet with model preset file. Modular: one quadlet container per model |
 | `router` | `router`, `bifrost` | Modular only: deploys Bifrost router quadlet container with model routing config |
 | `chat` | `chat`, `openwebui` | Modular only: deploys Open WebUI quadlet container |
@@ -236,11 +236,11 @@ Bifrost config is generated from `roles/router/templates/router-config.json.j2` 
 |----------|---------|-------------|
 | `inference_standalone.port` | `80` | Standalone llama.cpp listening port |
 | `common_service_account.name` | `llm` | Service account for running containers |
-| `podman_network_name` | `artificial-intelligence` | Podman network name |
+| `podman_setup_network_name` | `artificial-intelligence` | Podman network name |
 | `router_bifrost.port` | `8080` | Bifrost listening port |
 | `chat_openwebui.port` | `80` | Open WebUI listening port |
 | `rocm_ttm_pages_limit` | `26214400` | ROCm TTM memory limit in pages |
-| `sys_hardening_enable_updates` | `true` | Enable unattended upgrades |
+| `system_hardening_enable_updates` | `true` | Enable unattended upgrades |
 
 ### Conditional Deployment
 
@@ -251,6 +251,6 @@ uv run ansible-playbook -i host, playbook.yml \
   --extra-vars "inference_enabled=false router_enabled=false"
 ```
 
-Toggleable vars: `inference_enabled`, `router_enabled`, `chat_enabled`, `svc_account_enabled`, `sys_hardening_enable_updates`, `rocm_enabled`.
+Toggleable vars: `inference_enabled`, `router_enabled`, `chat_enabled`, `svc_account_enabled`, `system_hardening_enable_updates`, `rocm_enabled`.
 
 The `llm_stack_mode` var (`standalone` / `modular`, default `modular`) additionally skips the router and chat roles in standalone mode.

@@ -1,5 +1,0 @@
----
-svc_account_name: llm
-svc_account_groups:
-  - render
-  - video

@@ -1,0 +1,3 @@
+---
+system_hardening_enable_updates: true
+system_hardening_unattended_reboot: false

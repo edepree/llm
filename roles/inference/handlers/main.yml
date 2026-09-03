@@ -1,14 +1,5 @@
 ---
-- name: Restart Standalone Inference Bare Metal
-  become: true
-  become_user: "{{ common_service_account.name }}"
-  ansible.builtin.systemd:
-    name: "{{ inference_standalone.name }}.service"
-    scope: user
-    daemon_reload: true
-    state: restarted
-
-- name: Restart Standalone Inference Container
+- name: Restart Standalone Inference
   become: true
   become_user: "{{ common_service_account.name }}"
   ansible.builtin.systemd:

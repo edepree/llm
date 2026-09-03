@@ -1,0 +1,5 @@
+---
+service_account_name: llm
+service_account_groups:
+  - render
+  - video

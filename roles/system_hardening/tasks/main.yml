@@ -27,7 +27,7 @@
       Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
       Unattended-Upgrade::Remove-Unused-Dependencies "true";
 
-      Unattended-Upgrade::Automatic-Reboot "{{ sys_hardening_unattended_reboot | lower }}";
+      Unattended-Upgrade::Automatic-Reboot "{{ system_hardening_unattended_reboot | lower }}";
       Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
       Unattended-Upgrade::Automatic-Reboot-Time "03:00";
   notify: Restart Unattended-Upgrades
