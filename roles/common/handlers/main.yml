@@ -6,5 +6,5 @@
 - name: Restart Journald
   ansible.builtin.systemd:
     name: systemd-journald
-    state: reloaded
+    state: restarted
     scope: system

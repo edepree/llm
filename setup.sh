@@ -30,7 +30,7 @@ read -rp "Target Endpoint (default: host.example.com): " host
 host="${host:-host.example.com}"
 
 echo "Deployment mode:"
-echo "  1) Standalone llama.cpp (Bare Metal) - vendor installer + systemd service"
+echo "  1) Standalone llama.cpp (Bare Metal) - source build + systemd user service"
 echo "  2) Standalone llama.cpp (Podman)     - single server container (OpenAI-compatible API + built-in Web UI)"
 echo "  3) Modular Stack                     - llama.cpp containers + Bifrost router + Open WebUI"
 read -rp "Deployment Mode (default: 1): " mode_choice

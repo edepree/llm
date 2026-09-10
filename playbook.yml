@@ -4,14 +4,24 @@
   become: true
   vars:
     # Set via setup.sh prompt; running the playbook directly defaults to the modular stack
-    llm_stack_mode: "{{ llm_stack_mode | default('modular') }}"
+    llm_stack_mode: modular
 
   pre_tasks:
-    - name: Verify target is Ubuntu/Debian
+    - name: Validate Deployment Mode
       ansible.builtin.assert:
         that:
-          - ansible_facts['os_family'] == 'Debian'
-        fail_msg: "This playbook requires Ubuntu or Debian"
+          - llm_stack_mode in ['standalone-bare-metal', 'standalone-podman', 'modular']
+        fail_msg: "llm_stack_mode must be standalone-bare-metal, standalone-podman, or modular"
+      tags: [always]
+
+    - name: Verify Target is Ubuntu 26.04 x86_64
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] == '26.04'
+          - ansible_facts['architecture'] == 'x86_64'
+        fail_msg: "This playbook requires Ubuntu 26.04 on x86_64"
+      tags: [always]
 
   roles:
     - role: common

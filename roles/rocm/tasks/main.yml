@@ -17,6 +17,7 @@
         name:
           - libatomic1
           - libquadmath0
+          - python3-debian
         update_cache: true
 
     - name: Add AMD ROCm Repository

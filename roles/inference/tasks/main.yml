@@ -81,7 +81,7 @@
     HIP_CLANG_PATH: "{{ inference_standalone.rocm_path }}/lib/llvm/bin"
     PATH: >-
       {{ inference_standalone.rocm_path }}/bin:{{ inference_standalone.rocm_path }}/lib/llvm/bin:{{
-      ansible_facts['ansible_env']['PATH'] }}
+      ansible_facts['env']['PATH'] }}
   when:
     - llm_stack_mode == 'standalone-bare-metal'
     - llamacpp_source_fetch.changed or not llamacpp_installed_binary.stat.exists
@@ -191,7 +191,7 @@
     name: "{{ inference_standalone.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     network:
-      - artificial-intelligence
+      - "{{ podman_network_name }}"
     publish:
       - "{{ inference_standalone.port }}:8080/tcp"
     volume:
@@ -232,7 +232,7 @@
     name: "{{ model.name }}"
     image: ghcr.io/ggml-org/llama.cpp:server-rocm
     network:
-      - artificial-intelligence
+      - "{{ podman_network_name }}"
     publish:
       - "{{ model.port }}:8080/tcp"
     volume:
