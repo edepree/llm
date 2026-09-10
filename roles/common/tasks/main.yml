@@ -21,6 +21,22 @@
     sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
   notify: Reload Sysctl
 
+- name: Enable Tuned Service
+  ansible.builtin.service:
+    name: tuned
+    state: started
+    enabled: true
+
+- name: Read Active Tuned Profile
+  ansible.builtin.command: tuned-adm active
+  register: common_tuned_active
+  changed_when: false
+
+- name: Set Tuned Profile
+  ansible.builtin.command: tuned-adm profile {{ common_tuned_profile }}
+  when: common_tuned_profile not in common_tuned_active.stdout
+  changed_when: true
+
 - name: Ensure journald.conf.d Directory
   ansible.builtin.file:
     path: /etc/systemd/journald.conf.d

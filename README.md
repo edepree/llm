@@ -162,7 +162,7 @@ flowchart LR
 
 | Role | Tags | Purpose |
 |------|------|---------|
-| `common` | `common`, `system` | OS updates, packages (podman, ufw), sysctl, journald limits, base firewall |
+| `common` | `common`, `system` | OS updates, packages (podman, tuned, ufw), sysctl, tuned profile, journald limits, base firewall |
 | `service-account` | `accounts` | Creates the `llm` user with GPU access groups, enables systemd lingering |
 | `system-hardening` | `hardening`, `updates` | Unattended upgrades and reboot configuration |
 | `rocm` | `rocm`, `gpu` | ROCm memory configuration (TTM pages limit) |
@@ -240,6 +240,7 @@ Bifrost config is generated from `roles/router/templates/router-config.json.j2` 
 | `router_bifrost.port` | `8080` | Bifrost listening port |
 | `chat_openwebui.port` | `80` | Open WebUI listening port |
 | `rocm_ttm_pages_limit` | `26214400` | ROCm TTM memory limit in pages |
+| `common_tuned_profile` | `throughput-performance` | `tuned` performance profile applied on boot |
 | `sys_hardening_enable_updates` | `true` | Enable unattended upgrades |
 
 ### Conditional Deployment
