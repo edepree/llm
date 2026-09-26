@@ -3,7 +3,7 @@
   ansible.builtin.user:
     name: "{{ common_service_account.name }}"
     shell: /bin/bash
-    groups: "{{ svc_account_groups | join(',') }}"
+    groups: "{{ service_account_groups | join(',') }}"
     append: true
 
 - name: Enable Lingering for Service Account

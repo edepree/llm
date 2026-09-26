@@ -2,18 +2,8 @@
 - name: Deploy LLM Stack
   hosts: all
   become: true
-  vars:
-    # Set via setup.sh prompt; running the playbook directly defaults to the modular stack
-    llm_stack_mode: modular
 
   pre_tasks:
-    - name: Validate Deployment Mode
-      ansible.builtin.assert:
-        that:
-          - llm_stack_mode in ['standalone-bare-metal', 'standalone-podman', 'modular']
-        fail_msg: "llm_stack_mode must be standalone-bare-metal, standalone-podman, or modular"
-      tags: [always]
-
     - name: Verify Target is Ubuntu 26.04 x86_64
       ansible.builtin.assert:
         that:
@@ -27,26 +17,14 @@
     - role: common
       tags: [common, system]
 
-    - role: service-account
+    - role: service_account
       tags: [accounts]
 
-    - role: system-hardening
+    - role: system_hardening
       tags: [hardening, updates]
 
     - role: rocm
       tags: [rocm, gpu]
 
-    - role: podman-setup
-      tags: [podman, infrastructure]
-      when: llm_stack_mode != 'standalone-bare-metal'
-
     - role: inference
       tags: [inference, llamacpp]
-
-    - role: router
-      tags: [router, bifrost]
-      when: llm_stack_mode == 'modular'
-
-    - role: chat
-      tags: [chat, openwebui]
-      when: llm_stack_mode == 'modular'

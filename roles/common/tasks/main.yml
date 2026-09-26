@@ -1,10 +1,7 @@
 ---
-- name: Update and Upgrade Operating System
+- name: Update APT Cache
   ansible.builtin.apt:
-    autoclean: true
-    autoremove: true
     update_cache: true
-    upgrade: safe
 
 - name: Install Packages
   ansible.builtin.apt:
@@ -19,7 +16,6 @@
     sysctl_set: true
     reload: true
     sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
-  notify: Reload Sysctl
 
 - name: Enable Tuned Service
   ansible.builtin.service:

@@ -1,4 +1,4 @@
 ---
-svc_account_groups:
+service_account_groups:
   - render
   - video

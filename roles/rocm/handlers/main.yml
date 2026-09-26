@@ -1,1 +1,11 @@
 ---
+# amdgpu (and ttm) load from the initramfs, so the modprobe option only applies after a rebuild + reboot
+- name: Rebuild Initramfs
+  ansible.builtin.command: update-initramfs -u
+  changed_when: true
+  listen: TTM Changed
+
+- name: Reboot Notice
+  ansible.builtin.debug:
+    msg: "TTM pages_limit changed: reboot the host for it to take effect"
+  listen: TTM Changed

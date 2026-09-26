@@ -29,28 +29,10 @@ uv run ansible-galaxy collection install -r requirements.yml
 read -rp "Target Endpoint (default: host.example.com): " host
 host="${host:-host.example.com}"
 
-echo "Deployment mode:"
-echo "  1) Standalone llama.cpp (Bare Metal) - source build + systemd user service"
-echo "  2) Standalone llama.cpp (Podman)     - single server container (OpenAI-compatible API + built-in Web UI)"
-echo "  3) Modular Stack                     - llama.cpp containers + Bifrost router + Open WebUI"
-read -rp "Deployment Mode (default: 1): " mode_choice
-case "${mode_choice:-1}" in
-  2)
-    stack_mode=standalone-podman
-    ;;
-  3)
-    stack_mode=modular
-    ;;
-  *)
-    stack_mode=standalone-bare-metal
-    ;;
-esac
-
 cmd=(
   uv run ansible-playbook
   -i "${host},"
   playbook.yml
-  --extra-vars "llm_stack_mode=${stack_mode}"
 )
 
 case "$host" in
