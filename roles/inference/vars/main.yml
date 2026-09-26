@@ -1,4 +1,3 @@
 ---
-# handler that restarts whichever standalone server this mode runs
-inference_standalone_restart_handler: >-
-  {{ 'Restart Standalone Inference Bare Metal' if llm_stack_mode == 'standalone-bare-metal' else 'Restart Standalone Inference Container' }}
+inference_home: "{{ ansible_facts.getent_passwd[common_service_account.name][4] }}"
+inference_image: "localhost/llama-server:{{ inference_server.llama_ref }}-rocm{{ inference_server.rocm_version }}"
