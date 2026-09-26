@@ -1,3 +1,5 @@
 ---
 inference_home: "{{ ansible_facts.getent_passwd[common_service_account.name][4] }}"
-inference_image: "localhost/llama-server:{{ inference_server.llama_ref }}-rocm{{ inference_server.rocm_version }}"
+# ROCm 10.0 and gfx1151 are fixed in files/Containerfile; change both together
+inference_image_tag: "{{ inference_server.llama_ref }}-rocm10.0"
+inference_image: "localhost/llama-server:{{ inference_image_tag }}"

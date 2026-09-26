@@ -38,13 +38,11 @@
   become_user: "{{ common_service_account.name }}"
   containers.podman.podman_image:
     name: localhost/llama-server
-    tag: "{{ inference_server.llama_ref }}-rocm{{ inference_server.rocm_version }}"
+    tag: "{{ inference_image_tag }}"
     path: "{{ inference_home }}/build/llama-server"
     build:
       file: "{{ inference_home }}/build/llama-server/Containerfile"
-      extra_args: >-
-        --build-arg LLAMA_REF={{ inference_server.llama_ref }}
-        --build-arg GPU_TARGET={{ inference_server.gpu_target }}
+      extra_args: --build-arg LLAMA_REF={{ inference_server.llama_ref }}
     force: false
     state: present
   async: 3600 # keep a dropped SSH session from killing the build
@@ -86,19 +84,13 @@
     state: quadlet
     quadlet_options:
       - |
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+
         [Install]
         WantedBy=default.target
   notify: Restart Inference
-
-- name: Enable and Start llama-server
-  become: true
-  become_user: "{{ common_service_account.name }}"
-  ansible.builtin.systemd:
-    name: "{{ inference_server.name }}.service"
-    scope: user
-    daemon_reload: true
-    enabled: true
-    state: started
 
 - name: Configure Inference Firewall Rules
   community.general.ufw:
@@ -108,6 +100,17 @@
 
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
+
+# no-op after a handler restart; starts the service if it was stopped
+- name: Enable and Start llama-server
+  become: true
+  become_user: "{{ common_service_account.name }}"
+  ansible.builtin.systemd:
+    name: "{{ inference_server.name }}.service"
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
 
 - name: Wait for llama-server Health
   ansible.builtin.uri:

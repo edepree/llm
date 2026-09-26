@@ -60,8 +60,8 @@ flowchart LR
     LLAMA --> CACHE["llamacpp-models volume\n(model downloads)"]
 ```
 
-1. The Containerfile (`roles/inference/files/Containerfile`) builds llama.cpp at `inference_server.llama_ref` with ROCm's clang for `gpu_target` only, in a builder stage; the runtime stage carries only the ROCm runtime and the binaries.
-2. The image is tagged `localhost/llama-server:<llama_ref>-rocm<rocm_version>`. It is built when that tag does not exist, or when the Containerfile changed since the tag was built (the tag is then overwritten).
+1. The Containerfile (`roles/inference/files/Containerfile`) builds llama.cpp at `inference_server.llama_ref` with ROCm's clang for `gfx1151` only, in a builder stage; the runtime stage carries only the ROCm runtime and the binaries.
+2. The image is tagged `localhost/llama-server:<llama_ref>-rocm10.0`. It is built when that tag does not exist, or when the Containerfile changed since the tag was built (the tag is then overwritten).
 3. The playbook checks that the container sees the GPU (`llama-server --list-devices` must list `ROCm0`), deploys the Quadlet, and waits for `/health`.
 
 ## Upgrading and Rolling Back llama.cpp
@@ -109,15 +109,13 @@ inference_server:
         temp: 1.0
 ```
 
-Keys are llama.cpp CLI arguments without leading dashes (see the [model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Quote flag values as strings (`"true"`); bare YAML booleans render as `True`. An unknown key stops the server from starting — check `journalctl --user -u llamacpp-server.service`.
+Keys are llama.cpp CLI arguments without leading dashes (see the [model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Booleans render as `true`/`false`. An unknown key stops the server from starting — check `journalctl --user -u llamacpp-server.service`.
 
 ### Key Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `inference_server.llama_ref` | `v0.5.0` | llama.cpp git tag built into the image |
-| `inference_server.rocm_version` | `10.0` | ROCm version (part of the image tag) |
-| `inference_server.gpu_target` | `gfx1151` | GPU architecture compiled for |
 | `inference_server.port` | `80` | Host port for the API and Web UI |
 | `common_service_account.name` | `llm` | Account that owns and runs the service |
 | `rocm_ttm_pages_limit` | `26214400` | TTM pages limit (GPU-addressable system memory) |
