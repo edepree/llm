@@ -47,6 +47,8 @@
         --build-arg GPU_TARGET={{ inference_server.gpu_target }}
     force: false
     state: present
+  async: 3600 # keep a dropped SSH session from killing the build
+  poll: 30
   notify: Restart Inference
 
 # /health passes without a GPU (no model loads at startup), so check device passthrough explicitly
@@ -58,7 +60,7 @@
     {{ inference_image }} --list-devices
   register: inference_devices
   changed_when: false
-  failed_when: inference_server.gpu_target not in (inference_devices.stdout + inference_devices.stderr)
+  failed_when: "'ROCm0' not in inference_devices.stdout"
 
 - name: Deploy Quadlet for llama-server
   become: true

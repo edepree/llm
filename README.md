@@ -41,13 +41,14 @@ Only `models_max` model(s) are resident at once (default `1`); requesting anothe
 
 ## Managing the Service
 
-The service runs as a systemd user service under `common_service_account.name` (`llm` by default). Run these in that account's login session (e.g. SSH in as `llm`):
+The service runs as a systemd user service under `common_service_account.name` (`llm` by default), which has no password or SSH key. From the admin account:
 
 ```bash
-systemctl --user status llamacpp-server.service
-systemctl --user restart llamacpp-server.service
-journalctl --user -u llamacpp-server.service -f
-podman images localhost/llama-server
+alias llm='sudo -u llm XDG_RUNTIME_DIR=/run/user/$(id -u llm)'
+llm systemctl --user status llamacpp-server.service
+llm systemctl --user restart llamacpp-server.service
+llm journalctl --user -u llamacpp-server.service -f
+llm podman images localhost/llama-server
 ```
 
 ## Architecture
@@ -60,8 +61,8 @@ flowchart LR
 ```
 
 1. The Containerfile (`roles/inference/files/Containerfile`) builds llama.cpp at `inference_server.llama_ref` with ROCm's clang for `gpu_target` only, in a builder stage; the runtime stage carries only the ROCm runtime and the binaries.
-2. The image is tagged `localhost/llama-server:<llama_ref>-rocm<rocm_version>` and is only built when that tag does not exist yet.
-3. The playbook checks that the container sees the GPU (`llama-server --list-devices` must list `gfx1151`), deploys the Quadlet, and waits for `/health`.
+2. The image is tagged `localhost/llama-server:<llama_ref>-rocm<rocm_version>`. It is built when that tag does not exist, or when the Containerfile changed since the tag was built (the tag is then overwritten).
+3. The playbook checks that the container sees the GPU (`llama-server --list-devices` must list `ROCm0`), deploys the Quadlet, and waits for `/health`.
 
 ## Upgrading and Rolling Back llama.cpp
 
@@ -73,7 +74,9 @@ uv run ansible-playbook -i <host>, playbook.yml --tags inference -u <user> --ask
 
 A new tag builds a new image and restarts the service; older images stay on the host.
 
-**Roll back:** set `llama_ref` back to the previous tag and rerun. The old image is still local, so nothing is rebuilt. Prune old images as `llm` with `podman image rm localhost/llama-server:<tag>`.
+**Roll back:** set `llama_ref` back to the previous tag and rerun. The old image is still local, so nothing is rebuilt — unless the Containerfile changed in between, which triggers a rebuild of that tag.
+
+**Disk:** each build leaves an untagged builder image with the full ROCm toolchain (many GB). Clean up as `llm` with `podman image prune -f`, and remove old tags with `podman image rm localhost/llama-server:<tag>`.
 
 ## Roles Reference
 
@@ -129,7 +132,7 @@ After `./setup.sh --dev`:
 ./validate.sh
 ```
 
-Runs an Ansible syntax check and offline strict production lint. To test the image without deploying:
+Runs an Ansible syntax check and offline strict production lint. To test the image build without deploying (the playbook rebuilds images it did not build itself):
 
 ```bash
 podman build --build-arg LLAMA_REF=v0.5.0 -t localhost/llama-server:v0.5.0-rocm10.0 roles/inference/files

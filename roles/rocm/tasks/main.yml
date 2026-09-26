@@ -7,3 +7,7 @@
       options ttm pages_limit={{ rocm_ttm_pages_limit }}
     mode: "0644"
   notify: TTM Changed
+
+# run the initramfs rebuild now: queued handlers are lost if a later task (e.g. the long image build) fails
+- name: Apply TTM Change
+  ansible.builtin.meta: flush_handlers
