@@ -41,22 +41,18 @@ inference_presets:
     c: 262144
     hf-repo: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
     min-p: 0.00
-    reasoning-preserve: true
     spec-default: true
     spec-draft-n-max: 2
     spec-type: draft-mtp
     temp: 1.0
     top-k: 20
     top-p: 0.95
-  "unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL":
+  "unsloth/Qwen3.8-Flash-Next-GGUF:UD-IQ4_XS":
     c: 262144
-    hf-repo: unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL
+    hf-repo: unsloth/Qwen3.8-Flash-Next-GGUF:UD-IQ4_XS
     min-p: 0.00
     presence-penalty: 0.0
-    reasoning-preserve: true
     spec-default: true
-    spec-draft-n-max: 2
-    spec-type: draft-mtp
     temp: 1.0
     top-k: 20
     top-p: 0.95

@@ -13,7 +13,6 @@
     creates: /var/lib/systemd/linger/{{ inference_user }}
 
 # rootless podman binds the host port as the service account.
-# ponytail: lets any local user bind ports from inference_port to 1023; fine on a single-purpose host
 - name: Allow Unprivileged Bind to Inference Port
   ansible.posix.sysctl:
     name: net.ipv4.ip_unprivileged_port_start
