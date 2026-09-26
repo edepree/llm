@@ -1,5 +1,5 @@
 ---
-# ROCm userspace lives in the llama-server image; the host only needs the kernel driver and GTT limit
+# ROCm is in the llama-server image; the host needs only the kernel driver and the TTM limit
 - name: Set TTM Pages Limits
   ansible.builtin.copy:
     dest: /etc/modprobe.d/ttm.conf
@@ -8,6 +8,6 @@
     mode: "0644"
   notify: TTM Changed
 
-# run the initramfs rebuild now: queued handlers are lost if a later task (e.g. the long image build) fails
+# rebuild the initramfs now: queued handlers are lost if a later task fails
 - name: Apply TTM Change
   ansible.builtin.meta: flush_handlers

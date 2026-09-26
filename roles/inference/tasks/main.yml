@@ -32,7 +32,7 @@
     mode: "0644"
   notify: Restart Inference
 
-# builds only when this tag is missing (first run or llama_ref bump); takes 20-40 minutes
+# builds when the tag is missing or the Containerfile changed; a build takes 20-40 minutes
 - name: Build llama-server Image
   become: true
   become_user: "{{ common_service_account.name }}"
@@ -45,11 +45,11 @@
       extra_args: --build-arg LLAMA_REF={{ inference_server.llama_ref }}
     force: false
     state: present
-  async: 3600 # keep a dropped SSH session from killing the build
+  async: 3600 # the build continues if the SSH connection drops
   poll: 30
   notify: Restart Inference
 
-# /health passes without a GPU (no model loads at startup), so check device passthrough explicitly
+# /health returns 200 without a GPU because no model loads at startup, so check the device here
 - name: Verify GPU Is Visible in Container
   become: true
   become_user: "{{ common_service_account.name }}"
@@ -101,7 +101,7 @@
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
 
-# no-op after a handler restart; starts the service if it was stopped
+# starts the service if it is stopped; no change after a handler restart
 - name: Enable and Start llama-server
   become: true
   become_user: "{{ common_service_account.name }}"

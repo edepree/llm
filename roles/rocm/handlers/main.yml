@@ -1,5 +1,5 @@
 ---
-# amdgpu (and ttm) load from the initramfs, so the modprobe option only applies after a rebuild + reboot
+# amdgpu and ttm load from the initramfs, so the option applies only after a rebuild and a reboot
 - name: Rebuild Initramfs
   ansible.builtin.command: update-initramfs -u
   changed_when: true

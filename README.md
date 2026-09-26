@@ -2,27 +2,27 @@
 
 A local LLM inference server for AMD Strix Halo (Ryzen AI Max, `gfx1151`), deployed via Ansible on **Ubuntu 26.04 x86_64**. Other distributions, releases, and architectures are not supported.
 
-The playbook builds a llama.cpp `llama-server` image **on the target** against ROCm 10.0 for `gfx1151` only, and runs it as a rootless Podman Quadlet user service. The host carries no ROCm userspace: only the kernel driver, the GTT (TTM) limit, and Podman.
+The playbook builds a llama.cpp `llama-server` image on the target host with ROCm 10.0 for `gfx1151`, and runs it as a rootless Podman Quadlet user service. ROCm is only in the image. The host needs the kernel driver, the TTM memory limit, and Podman.
 
 ## Quick Start
 
 ```bash
-# production — installs the toolchain and deploys to the target host
+# install the toolchain and deploy to the target host
 ./setup.sh
 
-# development — installs the toolchain only (no deployment)
+# install the toolchain only
 ./setup.sh --dev
 ```
 
 The setup script prompts for:
 - **Target Endpoint** — hostname or IP of the target machine (default: `host.example.com`)
-- **Target User** — SSH user for remote targets (default: `ubuntu`); `localhost` uses the local connection
+- **Target User** — SSH user for remote targets (default: `ubuntu`). For `localhost`, the playbook uses a local connection.
 
-The first run builds the image (20–40 minutes) before the service starts.
+The first run builds the image before the service starts. This takes 20–40 minutes.
 
 ### First Boot
 
-The TTM limit is applied through the initramfs, so **reboot after the first run** (the playbook prints a notice whenever the limit changes). Verify:
+The TTM limit is set in the initramfs, so **reboot after the first run**. The playbook prints a notice when the limit changes. To check the limit:
 
 ```bash
 cat /sys/module/ttm/parameters/pages_limit   # equals rocm_ttm_pages_limit
@@ -35,15 +35,15 @@ cat /sys/module/ttm/parameters/pages_limit   # equals rocm_ttm_pages_limit
 | SSH | 22 | Remote access |
 | llama-server | 80 | OpenAI-compatible API (`/v1`) + built-in Web UI (`/`) |
 
-Chat at `http://<target>` in your browser; the API is at `http://<target>/v1`. List the registered model IDs with `curl http://<target>/v1/models`.
+Open `http://<target>` in a browser to chat. The API is at `http://<target>/v1`. To list the model IDs, run `curl http://<target>/v1/models`.
 
-Only `models_max` model(s) are resident at once (default `1`); requesting another model unloads an idle one (LRU). There is no API key: run it on a trusted network only.
+At most `models_max` models are loaded at once (default `1`). A request for another model unloads the least recently used idle model. There is no API key, so use it only on a trusted network.
 
 ## Managing the Service
 
-The service runs as a systemd user service under `common_service_account.name` (`llm` by default), which has no password or SSH key. Lingering keeps its user manager running without a login, and the manager provides `XDG_RUNTIME_DIR` to the service itself, so nothing needs it in `.bashrc`.
+The service is a systemd user service of the account `common_service_account.name` (`llm` by default). The account has no password or SSH key. Lingering starts its user manager at boot without a login, and the user manager sets `XDG_RUNTIME_DIR` for the service. You do not need to set it in `.bashrc`.
 
-From the admin account, target the account's user manager directly:
+From the admin account:
 
 ```bash
 sudo systemctl --user -M llm@ status llamacpp-server.service
@@ -51,14 +51,14 @@ sudo systemctl --user -M llm@ restart llamacpp-server.service
 sudo journalctl --user -M llm@ -u llamacpp-server.service -f
 ```
 
-For an interactive shell as `llm` (e.g. to run `podman`), open a real login session:
+For a shell as `llm`, for example to run `podman`, open a login session:
 
 ```bash
 sudo machinectl shell llm@
 podman images localhost/llama-server
 ```
 
-`sudo -u llm` and `su - llm` do not open a login session, so `XDG_RUNTIME_DIR` is unset and `systemctl --user` / `podman` talk to the wrong (or no) runtime directory.
+`sudo -u llm` and `su - llm` do not open a login session. `XDG_RUNTIME_DIR` is then not set, and `systemctl --user` and `podman` cannot find the user manager or the container state.
 
 ## Architecture
 
@@ -69,9 +69,9 @@ flowchart LR
     LLAMA --> CACHE["llamacpp-models volume\n(model downloads)"]
 ```
 
-1. The Containerfile (`roles/inference/files/Containerfile`) builds llama.cpp at `inference_server.llama_ref` with ROCm's clang for `gfx1151` only, in a builder stage; the runtime stage carries only the ROCm runtime and the binaries.
-2. The image is tagged `localhost/llama-server:<llama_ref>-rocm10.0`. It is built when that tag does not exist, or when the Containerfile changed since the tag was built (the tag is then overwritten).
-3. The playbook checks that the container sees the GPU (`llama-server --list-devices` must list `ROCm0`), deploys the Quadlet, and waits for `/health`.
+1. `roles/inference/files/Containerfile` has two stages. The builder stage compiles llama.cpp at `inference_server.llama_ref` for `gfx1151` with ROCm's clang. The runtime stage contains only the ROCm runtime and the llama.cpp binaries.
+2. The image tag is `localhost/llama-server:<llama_ref>-rocm10.0`. The playbook builds the image when the tag does not exist or when the Containerfile changed. A rebuild replaces the existing tag.
+3. The playbook checks that the container can use the GPU (`llama-server --list-devices` must list `ROCm0`), deploys the Quadlet, and waits until `/health` returns 200.
 
 ## Upgrading and Rolling Back llama.cpp
 
@@ -81,11 +81,11 @@ flowchart LR
 uv run ansible-playbook -i <host>, playbook.yml --tags inference -u <user> --ask-pass --ask-become-pass
 ```
 
-A new tag builds a new image and restarts the service; older images stay on the host.
+A new tag builds a new image and restarts the service. Older images stay on the host.
 
-**Roll back:** set `llama_ref` back to the previous tag and rerun. The old image is still local, so nothing is rebuilt — unless the Containerfile changed in between, which triggers a rebuild of that tag.
+**Roll back:** set `llama_ref` to the previous tag and run the playbook again. The old image is still on the host, so no build runs, unless the Containerfile changed since that image was built.
 
-**Disk:** each build leaves an untagged builder image with the full ROCm toolchain (many GB). Clean up in `sudo machinectl shell llm@` with `podman image prune -f`, and remove old tags with `podman image rm localhost/llama-server:<tag>`.
+**Disk:** each build leaves an untagged builder image that contains the ROCm toolchain (several GB). In `sudo machinectl shell llm@`, remove it with `podman image prune -f`, and remove old tags with `podman image rm localhost/llama-server:<tag>`.
 
 ## Roles Reference
 
@@ -94,19 +94,19 @@ A new tag builds a new image and restarts the service; older images stay on the 
 | `common` | `common`, `system` | APT cache, packages (podman, systemd-container, tuned, ufw), unprivileged port 80, tuned profile, journald limits, base firewall |
 | `service_account` | `accounts` | Creates the service account with `render`/`video` groups and enables lingering |
 | `system_hardening` | `hardening`, `updates` | Unattended upgrades, Ubuntu security pocket only |
-| `rocm` | `rocm`, `gpu` | TTM pages limit + initramfs rebuild (no ROCm packages on the host) |
+| `rocm` | `rocm`, `gpu` | TTM pages limit and initramfs rebuild (no ROCm packages on the host) |
 | `inference` | `inference`, `llamacpp` | Image build, GPU check, preset file, Quadlet, firewall, health check |
 
 ## Configuration
 
 ### Model Presets
 
-The server is configured through a preset `.ini` generated from `inference_server` in `roles/inference/defaults/main.yml`, which is the source of truth for the configured models:
+The playbook generates the server's preset `.ini` file from `inference_server` in `roles/inference/defaults/main.yml`. That file defines the models:
 
 ```yaml
 inference_server:
   models_max: 1
-  global_settings: # [*] section, shared by all models
+  global_settings: # [*] section: applies to all models
     n-gpu-layers: 999
     load-mode: none
   presets: # one section per model
@@ -114,11 +114,11 @@ inference_server:
       settings:
         c: 131072
         hf-repo: organization/model-GGUF:UD-Q8_K_XL
-        load-on-startup: "true" # optional: load at boot (at most one preset)
+        load-on-startup: "true" # optional: load at startup (use on one preset at most)
         temp: 1.0
 ```
 
-Keys are llama.cpp CLI arguments without leading dashes (see the [model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Booleans render as `true`/`false`. An unknown key stops the server from starting — check `journalctl --user -u llamacpp-server.service`.
+Keys are llama.cpp CLI arguments without leading dashes (see the [model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Booleans are written as `true`/`false`. The server does not start if a key is unknown. Check the log with `sudo journalctl --user -M llm@ -u llamacpp-server.service`.
 
 ### Key Variables
 
@@ -139,8 +139,10 @@ After `./setup.sh --dev`:
 ./validate.sh
 ```
 
-Runs an Ansible syntax check and offline strict production lint. To test the image build without deploying (the playbook rebuilds images it did not build itself):
+This runs an Ansible syntax check and `ansible-lint` with the production profile. To test the image build without deploying:
 
 ```bash
 podman build --build-arg LLAMA_REF=v0.5.0 -t localhost/llama-server:v0.5.0-rocm10.0 roles/inference/files
 ```
+
+The playbook does not reuse an image built this way: it rebuilds it, because the image lacks the Containerfile hash label that the playbook checks.

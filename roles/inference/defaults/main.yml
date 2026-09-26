@@ -2,15 +2,15 @@
 inference_server:
   name: llamacpp-server
   port: 80
-  # llama.cpp git tag built into the image; bump to upgrade, set back to roll back
+  # llama.cpp release tag to build; change it to upgrade or roll back
   llama_ref: v0.5.0
   models_max: 1
   cache_path: /models
-  # [*] section of the preset file, shared by all presets
+  # [*] section: applies to all presets
   global_settings:
     flash-attn: "on"
     n-gpu-layers: 999
-    load-mode: none # no mmap: much faster model loads on unified memory
+    load-mode: none # read the model into memory instead of using mmap
     threads: 32
   presets:
     - section: unsloth/gpt-oss-20b-GGUF:F16

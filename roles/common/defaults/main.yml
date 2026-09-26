@@ -2,7 +2,7 @@
 common_packages:
   - acl
   - podman
-  - systemd-container # machinectl shell / journalctl -M for the service account
+  - systemd-container # provides machinectl and journalctl -M
   - tuned
   - ufw
 

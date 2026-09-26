@@ -1,5 +1,5 @@
 # llama-server for AMD Strix Halo (gfx1151) on ROCm 10.0.
-# Based on kyuz0/amd-strix-halo-toolboxes Dockerfile.rocm-10.0, rebased on Ubuntu 26.04.
+# Based on kyuz0/amd-strix-halo-toolboxes Dockerfile.rocm-10.0, using Ubuntu 26.04.
 
 FROM docker.io/library/ubuntu:26.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
@@ -33,7 +33,7 @@ WORKDIR /src
 RUN test -n "${LLAMA_REF}" || { echo "ERROR: LLAMA_REF build arg is required"; exit 1; } \
   && git clone --depth 1 --branch "${LLAMA_REF}" https://github.com/ggml-org/llama.cpp.git .
 
-# ROCm's own clang (via hipconfig) is the only compiler that sees the amdgcn device libs.
+# Use ROCm's clang (from hipconfig): it finds the amdgcn device libraries. The distro clang does not.
 RUN HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" cmake -S . -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/opt/llama \
