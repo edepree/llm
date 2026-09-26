@@ -1,0 +1,57 @@
+# llama-server for AMD Strix Halo (gfx1151) on ROCm 10.0.
+# Based on kyuz0/amd-strix-halo-toolboxes Dockerfile.rocm-10.0, rebased on Ubuntu 26.04.
+
+FROM docker.io/library/ubuntu:26.04 AS base
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl gpg \
+  && install -d /etc/apt/keyrings \
+  && curl -fsSL https://stable.repo.amd.com/rocm/gpg/packages.gpg | gpg --dearmor -o /etc/apt/keyrings/amdrocm.gpg \
+  && printf '%s\n' \
+    'Types: deb' \
+    'URIs: https://stable.repo.amd.com/rocm/core/packages/ubuntu2604/' \
+    'Suites: stable' \
+    'Components: main' \
+    'Architectures: amd64' \
+    'Signed-By: /etc/apt/keyrings/amdrocm.gpg' \
+    > /etc/apt/sources.list.d/amdrocm.sources \
+  && rm -rf /var/lib/apt/lists/*
+ENV ROCM_PATH=/opt/rocm/core-10.0 \
+  HIP_PATH=/opt/rocm/core-10.0 \
+  PATH=/opt/rocm/core-10.0/bin:/opt/rocm/core-10.0/lib/llvm/bin:$PATH
+
+FROM base AS builder
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential cmake ninja-build git libssl-dev pkg-config python3 \
+    amdrocm-core-dev10.0-gfx1151 librocwmma-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+ARG LLAMA_REF
+ARG GPU_TARGET=gfx1151
+WORKDIR /src
+RUN test -n "${LLAMA_REF}" || { echo "ERROR: LLAMA_REF build arg is required"; exit 1; } \
+  && git clone --depth 1 --branch "${LLAMA_REF}" https://github.com/ggml-org/llama.cpp.git .
+
+# ROCm's own clang (via hipconfig) is the only compiler that sees the amdgcn device libs.
+RUN HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" cmake -S . -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/opt/llama \
+    -DCMAKE_INSTALL_RPATH=/opt/llama/lib \
+    -DGGML_HIP=ON \
+    -DGPU_TARGETS="${GPU_TARGET}" \
+    -DGGML_HIP_ROCWMMA_FATTN=ON \
+    -DGGML_HIP_NO_VMM=ON \
+    -DGGML_HIP_MMQ_MFMA=ON \
+  && cmake --build build \
+  && cmake --install build
+
+FROM base
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends amdrocm10.0-gfx1151 libgomp1 libssl3t64 \
+  && rm -rf /var/lib/apt/lists/* \
+  && printf '%s\n' /opt/rocm/core-10.0/lib /opt/rocm/core-10.0/lib/rocm_sysdeps/lib > /etc/ld.so.conf.d/rocm.conf \
+  && ldconfig
+COPY --from=builder /opt/llama /opt/llama
+ENV PATH=/opt/llama/bin:$PATH
+ENTRYPOINT ["llama-server"]
