@@ -18,6 +18,8 @@ The setup script prompts for:
 - **Target Endpoint** — hostname or IP of the target machine (default: `host.example.com`)
 - **Target User** — SSH user for remote targets (default: `ubuntu`). For `localhost`, the playbook uses a local connection.
 
+Remote targets log in with the SSH password (press Enter at the prompt to use an SSH key instead). Password login needs `sshpass` on the machine running Ansible (`sudo apt install sshpass`). A new host key is accepted on first connect; a changed key is rejected.
+
 The first run builds the image before the service starts. This takes 20–40 minutes.
 
 ### First Boot
@@ -25,7 +27,7 @@ The first run builds the image before the service starts. This takes 20–40 min
 The TTM limit is set in the initramfs, so **reboot after the first run**. The playbook prints a notice when the limit changes. To check the limit:
 
 ```bash
-cat /sys/module/ttm/parameters/pages_limit   # equals rocm_ttm_pages_limit
+cat /sys/module/ttm/parameters/pages_limit   # equals common_ttm_pages_limit
 ```
 
 ## Service
@@ -37,11 +39,11 @@ cat /sys/module/ttm/parameters/pages_limit   # equals rocm_ttm_pages_limit
 
 Open `http://<target>` in a browser to chat. The API is at `http://<target>/v1`. To list the model IDs, run `curl http://<target>/v1/models`.
 
-At most `models_max` models are loaded at once (default `1`). A request for another model unloads the least recently used idle model. There is no API key, so use it only on a trusted network.
+At most `inference_models_max` models are loaded at once (default `1`). A request for another model unloads the least recently used idle model. There is no API key, so use it only on a trusted network.
 
 ## Managing the Service
 
-The service is a systemd user service of the account `common_service_account.name` (`llm` by default). The account has no password or SSH key. Lingering starts its user manager at boot without a login, and the user manager sets `XDG_RUNTIME_DIR` for the service. You do not need to set it in `.bashrc`.
+The service is a systemd user service of the account `inference_user` (`llm` by default). The account has no password or SSH key. Lingering starts its user manager at boot without a login, and the user manager sets `XDG_RUNTIME_DIR` for the service. You do not need to set it in `.bashrc`.
 
 From the admin account:
 
@@ -69,21 +71,23 @@ flowchart LR
     LLAMA --> CACHE["llamacpp-models volume\n(model downloads)"]
 ```
 
-1. `roles/inference/files/Containerfile` has two stages. The builder stage compiles llama.cpp at `inference_server.llama_ref` for `gfx1151` with ROCm's clang. The runtime stage contains only the ROCm runtime and the llama.cpp binaries.
+1. `roles/inference/files/Containerfile` has two stages. The builder stage compiles llama.cpp at `inference_llama_ref` for `gfx1151` with ROCm's clang. The runtime stage contains only the ROCm runtime and the llama.cpp binaries.
 2. The image tag is `localhost/llama-server:<llama_ref>-rocm10.0`. The playbook builds the image when the tag does not exist or when the Containerfile changed. A rebuild replaces the existing tag.
 3. The playbook checks that the container can use the GPU (`llama-server --list-devices` must list `ROCm0`), deploys the Quadlet, and waits until `/health` returns 200.
 
 ## Upgrading and Rolling Back llama.cpp
 
-**Upgrade:** set `inference_server.llama_ref` in `roles/inference/defaults/main.yml` to a new [llama.cpp release tag](https://github.com/ggml-org/llama.cpp/releases), then:
+**Upgrade:** set `inference_llama_ref` in `roles/inference/defaults/main.yml` to a new [llama.cpp release tag](https://github.com/ggml-org/llama.cpp/releases), then:
 
 ```bash
 uv run ansible-playbook -i <host>, playbook.yml --tags inference -u <user> --ask-pass --ask-become-pass
+# or, without editing the file:
+uv run ansible-playbook -i <host>, playbook.yml --tags inference -u <user> --ask-pass --ask-become-pass -e inference_llama_ref=<tag>
 ```
 
 A new tag builds a new image and restarts the service. Older images stay on the host.
 
-**Roll back:** set `llama_ref` to the previous tag and run the playbook again. The old image is still on the host, so no build runs, unless the Containerfile changed since that image was built.
+**Roll back:** set `inference_llama_ref` to the previous tag and run the playbook again. The old image is still on the host, so no build runs, unless the Containerfile changed since that image was built.
 
 **Disk:** each build leaves an untagged builder image that contains the ROCm toolchain (several GB). In `sudo machinectl shell llm@`, remove it with `podman image prune -f`, and remove old tags with `podman image rm localhost/llama-server:<tag>`.
 
@@ -91,45 +95,40 @@ A new tag builds a new image and restarts the service. Older images stay on the 
 
 | Role | Tags | Purpose |
 |------|------|---------|
-| `common` | `common`, `system` | APT cache, packages (podman, systemd-container, tuned, ufw), unprivileged port 80, tuned profile, journald limits, base firewall |
-| `service_account` | `accounts` | Creates the service account with `render`/`video` groups and enables lingering |
-| `system_hardening` | `hardening`, `updates` | Unattended upgrades, Ubuntu security pocket only |
-| `rocm` | `rocm`, `gpu` | TTM pages limit and initramfs rebuild (no ROCm packages on the host) |
-| `inference` | `inference`, `llamacpp` | Image build, GPU check, preset file, Quadlet, firewall, health check |
+| `common` | `common` | Packages, tuned profile, journald limits, TTM pages limit and initramfs rebuild (no ROCm on the host), unattended security upgrades, base firewall |
+| `inference` | `inference` | Service account (`render`/`video`, lingering), unprivileged port, image build, GPU check, preset file, Quadlet, firewall, health check |
 
 ## Configuration
 
 ### Model Presets
 
-The playbook generates the server's preset `.ini` file from `inference_server` in `roles/inference/defaults/main.yml`. That file defines the models:
+The playbook generates the server's preset `.ini` file from `inference_presets` in `roles/inference/defaults/main.yml`. Each key is an `.ini` section: `"*"` applies to all models, every other key is one model:
 
 ```yaml
-inference_server:
-  models_max: 1
-  global_settings: # [*] section: applies to all models
+inference_presets:
+  "*":
     n-gpu-layers: 999
     load-mode: none
-  presets: # one section per model
-    - section: organization/model-GGUF:UD-Q8_K_XL
-      settings:
-        c: 131072
-        hf-repo: organization/model-GGUF:UD-Q8_K_XL
-        load-on-startup: "true" # optional: load at startup (use on one preset at most)
-        temp: 1.0
+  "organization/model-GGUF:UD-Q8_K_XL":
+    c: 131072
+    hf-repo: organization/model-GGUF:UD-Q8_K_XL
+    load-on-startup: true # optional: load at startup (use on one preset at most)
+    temp: 1.0
 ```
 
-Keys are llama.cpp CLI arguments without leading dashes (see the [model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). Booleans are written as `true`/`false`. The server does not start if a key is unknown. Check the log with `sudo journalctl --user -M llm@ -u llamacpp-server.service`.
+Keys are llama.cpp CLI arguments without leading dashes (see the [model presets documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets)). YAML booleans are written as `true`/`false`. The server does not start if a key is unknown. Check the log with `sudo journalctl --user -M llm@ -u llamacpp-server.service`.
 
 ### Key Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `inference_server.llama_ref` | `v0.5.0` | llama.cpp git tag built into the image |
-| `inference_server.port` | `80` | Host port for the API and Web UI |
-| `common_service_account.name` | `llm` | Account that owns and runs the service |
-| `rocm_ttm_pages_limit` | `26214400` | TTM pages limit (GPU-addressable system memory) |
+| `inference_llama_ref` | `v0.5.0` | llama.cpp git tag built into the image |
+| `inference_port` | `80` | Host port for the API and Web UI |
+| `inference_models_max` | `1` | Models loaded at once |
+| `inference_user` | `llm` | Account that owns and runs the service |
+| `common_ttm_pages_limit` | `26214400` | TTM pages limit (GPU-addressable system memory) |
 | `common_tuned_profile` | `throughput-performance` | `tuned` profile |
-| `system_hardening_unattended_reboot` | `false` | Allow unattended reboots at 03:00 |
+| `common_unattended_reboot` | `false` | Allow unattended reboots at 03:00 |
 
 ## Local Validation
 

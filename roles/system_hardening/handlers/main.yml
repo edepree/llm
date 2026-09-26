@@ -1,6 +1,0 @@
----
-- name: Restart Unattended-Upgrades
-  ansible.builtin.systemd:
-    name: unattended-upgrades
-    state: restarted
-    scope: system

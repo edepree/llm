@@ -1,66 +1,62 @@
 ---
-inference_server:
-  name: llamacpp-server
-  port: 80
-  # llama.cpp release tag to build; change it to upgrade or roll back
-  llama_ref: v0.5.0
-  models_max: 1
-  cache_path: /models
-  # [*] section: applies to all presets
-  global_settings:
+inference_user: llm
+inference_port: 80
+# llama.cpp release tag to build; change it to upgrade or roll back
+inference_llama_ref: v0.5.0
+inference_models_max: 1
+# ROCm 10.0 and gfx1151 are set in files/Containerfile; update this tag if you change them
+inference_image: "localhost/llama-server:{{ inference_llama_ref }}-rocm10.0"
+
+# one section per model; "*" applies to all of them
+inference_presets:
+  "*":
     flash-attn: "on"
     n-gpu-layers: 999
     load-mode: none # read the model into memory instead of using mmap
     threads: 32
-  presets:
-    - section: unsloth/gpt-oss-20b-GGUF:F16
-      settings:
-        c: 131072
-        hf-repo: unsloth/gpt-oss-20b-GGUF:F16
-        min-p: 0.00
-        temp: 1.0
-        top-k: 0
-        top-p: 1.0
-    - section: unsloth/gpt-oss-120b-GGUF:F16
-      settings:
-        c: 131072
-        hf-repo: unsloth/gpt-oss-120b-GGUF:F16
-        min-p: 0.00
-        temp: 1.0
-        top-k: 0
-        top-p: 1.0
-    - section: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
-      settings:
-        c: 262144
-        hf-repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
-        min-p: 0.00
-        spec-draft-n-max: 2
-        spec-type: draft-mtp
-        temp: 0.6
-        top-k: 20
-        top-p: 0.95
-    - section: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
-      settings:
-        c: 262144
-        hf-repo: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
-        min-p: 0.00
-        reasoning-preserve: "true"
-        spec-default: "true"
-        spec-draft-n-max: 2
-        spec-type: draft-mtp
-        temp: 1.0
-        top-k: 20
-        top-p: 0.95
-    - section: unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL
-      settings:
-        c: 262144
-        hf-repo: unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL
-        min-p: 0.00
-        presence-penalty: 0.0
-        reasoning-preserve: "true"
-        spec-default: "true"
-        spec-draft-n-max: 2
-        spec-type: draft-mtp
-        temp: 1.0
-        top-k: 20
-        top-p: 0.95
+  "unsloth/gpt-oss-20b-GGUF:F16":
+    c: 131072
+    hf-repo: unsloth/gpt-oss-20b-GGUF:F16
+    min-p: 0.00
+    temp: 1.0
+    top-k: 0
+    top-p: 1.0
+  "unsloth/gpt-oss-120b-GGUF:F16":
+    c: 131072
+    hf-repo: unsloth/gpt-oss-120b-GGUF:F16
+    min-p: 0.00
+    temp: 1.0
+    top-k: 0
+    top-p: 1.0
+  "unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL":
+    c: 262144
+    hf-repo: unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL
+    min-p: 0.00
+    spec-draft-n-max: 2
+    spec-type: draft-mtp
+    temp: 0.6
+    top-k: 20
+    top-p: 0.95
+  "unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL":
+    c: 262144
+    hf-repo: unsloth/Qwen3.8-27B-GGUF:UD-Q8_K_XL
+    min-p: 0.00
+    reasoning-preserve: true
+    spec-default: true
+    spec-draft-n-max: 2
+    spec-type: draft-mtp
+    temp: 1.0
+    top-k: 20
+    top-p: 0.95
+  "unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL":
+    c: 262144
+    hf-repo: unsloth/Qwen3.8-Flash-Next-GGUF:UD-Q4_K_XL
+    min-p: 0.00
+    presence-penalty: 0.0
+    reasoning-preserve: true
+    spec-default: true
+    spec-draft-n-max: 2
+    spec-type: draft-mtp
+    temp: 1.0
+    top-k: 20
+    top-p: 0.95

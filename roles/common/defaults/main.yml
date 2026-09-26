@@ -5,10 +5,13 @@ common_packages:
   - systemd-container # provides machinectl and journalctl -M
   - tuned
   - ufw
+  - unattended-upgrades
 
 common_tuned_profile: throughput-performance
 
 common_journald_maxuse: 1G
 
-common_service_account:
-  name: llm
+# GPU-addressable system memory, in 4 KiB pages
+common_ttm_pages_limit: 26214400
+
+common_unattended_reboot: false

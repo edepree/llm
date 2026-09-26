@@ -15,16 +15,7 @@
 
   roles:
     - role: common
-      tags: [common, system]
-
-    - role: service_account
-      tags: [accounts]
-
-    - role: system_hardening
-      tags: [hardening, updates]
-
-    - role: rocm
-      tags: [rocm, gpu]
+      tags: [common]
 
     - role: inference
-      tags: [inference, llamacpp]
+      tags: [inference]

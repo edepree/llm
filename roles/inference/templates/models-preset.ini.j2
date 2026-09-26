@@ -1,13 +1,8 @@
 version = 1
+{% for section, settings in inference_presets.items() %}
 
-[*]
-{% for key, value in inference_server.global_settings.items() %}
-{{ key }} = {{ value | lower if value is boolean else value }}
-{% endfor %}
-{% for preset in inference_server.presets %}
-
-[{{ preset.section }}]
-{% for key, value in preset.settings.items() %}
+[{{ section }}]
+{% for key, value in settings.items() %}
 {{ key }} = {{ value | lower if value is boolean else value }}
 {% endfor %}
 {% endfor %}

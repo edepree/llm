@@ -1,49 +1,63 @@
 ---
-- name: Look Up Service Account
-  ansible.builtin.getent:
-    database: passwd
-    key: "{{ common_service_account.name }}"
+- name: Create Service Account
+  ansible.builtin.user:
+    name: "{{ inference_user }}"
+    shell: /bin/bash
+    groups: [render, video]
+    append: true
+  register: inference_account
+
+- name: Enable Lingering for Service Account
+  ansible.builtin.command: loginctl enable-linger {{ inference_user }}
+  args:
+    creates: /var/lib/systemd/linger/{{ inference_user }}
+
+# rootless podman binds the host port as the service account.
+# ponytail: lets any local user bind ports from inference_port to 1023; fine on a single-purpose host
+- name: Allow Unprivileged Bind to Inference Port
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_unprivileged_port_start
+    value: "{{ inference_port }}"
+    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
+  when: inference_port < 1024
 
 - name: Create Inference Directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ common_service_account.name }}"
-    group: "{{ common_service_account.name }}"
+    owner: "{{ inference_user }}"
+    group: "{{ inference_user }}"
     mode: "0755"
   loop:
-    - "{{ inference_home }}/build/llama-server"
-    - "{{ inference_home }}/.config/llamacpp"
+    - "{{ inference_account.home }}/build/llama-server"
+    - "{{ inference_account.home }}/.config/llamacpp"
 
 - name: Copy Containerfile
   ansible.builtin.copy:
     src: Containerfile
-    dest: "{{ inference_home }}/build/llama-server/Containerfile"
-    owner: "{{ common_service_account.name }}"
-    group: "{{ common_service_account.name }}"
+    dest: "{{ inference_account.home }}/build/llama-server/Containerfile"
+    owner: "{{ inference_user }}"
+    group: "{{ inference_user }}"
     mode: "0644"
 
 - name: Deploy Model Preset Configuration
   ansible.builtin.template:
     src: models-preset.ini.j2
-    dest: "{{ inference_home }}/.config/llamacpp/models-preset.ini"
-    owner: "{{ common_service_account.name }}"
-    group: "{{ common_service_account.name }}"
+    dest: "{{ inference_account.home }}/.config/llamacpp/models-preset.ini"
+    owner: "{{ inference_user }}"
+    group: "{{ inference_user }}"
     mode: "0644"
   notify: Restart Inference
 
 # builds when the tag is missing or the Containerfile changed; a build takes 20-40 minutes
 - name: Build llama-server Image
   become: true
-  become_user: "{{ common_service_account.name }}"
+  become_user: "{{ inference_user }}"
   containers.podman.podman_image:
-    name: localhost/llama-server
-    tag: "{{ inference_image_tag }}"
-    path: "{{ inference_home }}/build/llama-server"
+    name: "{{ inference_image }}"
+    path: "{{ inference_account.home }}/build/llama-server"
     build:
-      file: "{{ inference_home }}/build/llama-server/Containerfile"
-      extra_args: --build-arg LLAMA_REF={{ inference_server.llama_ref }}
-    force: false
+      extra_args: --build-arg LLAMA_REF={{ inference_llama_ref }}
     state: present
   async: 3600 # the build continues if the SSH connection drops
   poll: 30
@@ -52,7 +66,7 @@
 # /health returns 200 without a GPU because no model loads at startup, so check the device here
 - name: Verify GPU Is Visible in Container
   become: true
-  become_user: "{{ common_service_account.name }}"
+  become_user: "{{ inference_user }}"
   ansible.builtin.command: >-
     podman run --rm --device /dev/kfd --device /dev/dri --group-add keep-groups
     {{ inference_image }} --list-devices
@@ -62,24 +76,24 @@
 
 - name: Deploy Quadlet for llama-server
   become: true
-  become_user: "{{ common_service_account.name }}"
+  become_user: "{{ inference_user }}"
   containers.podman.podman_container:
-    name: "{{ inference_server.name }}"
+    name: llamacpp-server
     image: "{{ inference_image }}"
     publish:
-      - "{{ inference_server.port }}:8080/tcp"
+      - "{{ inference_port }}:8080/tcp"
     volume:
-      - "llamacpp-models:{{ inference_server.cache_path }}"
-      - "{{ inference_home }}/.config/llamacpp/models-preset.ini:/models-preset.ini:ro"
+      - llamacpp-models:/models
+      - "{{ inference_account.home }}/.config/llamacpp/models-preset.ini:/models-preset.ini:ro"
     device:
       - /dev/dri
       - /dev/kfd
     group_add:
       - keep-groups
     env:
-      LLAMA_CACHE: "{{ inference_server.cache_path }}"
+      LLAMA_CACHE: /models
     command: >-
-      --models-preset /models-preset.ini --models-max {{ inference_server.models_max }}
+      --models-preset /models-preset.ini --models-max {{ inference_models_max }}
       --host 0.0.0.0 --port 8080
     state: quadlet
     quadlet_options:
@@ -92,29 +106,29 @@
         WantedBy=default.target
   notify: Restart Inference
 
-- name: Configure Inference Firewall Rules
+- name: Allow Inference Port
   community.general.ufw:
     rule: allow
-    port: "{{ inference_server.port | string }}"
+    port: "{{ inference_port | string }}"
     proto: tcp
 
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
 
-# starts the service if it is stopped; no change after a handler restart
-- name: Enable and Start llama-server
+# starts the service if it is stopped; no change after a handler restart.
+# no enabled: Quadlet units are generated, [Install] WantedBy starts them at boot
+- name: Start llama-server
   become: true
-  become_user: "{{ common_service_account.name }}"
+  become_user: "{{ inference_user }}"
   ansible.builtin.systemd:
-    name: "{{ inference_server.name }}.service"
+    name: llamacpp-server.service
     scope: user
     daemon_reload: true
-    enabled: true
     state: started
 
 - name: Wait for llama-server Health
   ansible.builtin.uri:
-    url: "http://localhost:{{ inference_server.port }}/health"
+    url: "http://localhost:{{ inference_port }}/health"
     status_code: 200
   register: inference_health
   until: inference_health.status == 200

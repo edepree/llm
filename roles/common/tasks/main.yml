@@ -1,21 +1,10 @@
 ---
-- name: Update APT Cache
-  ansible.builtin.apt:
-    update_cache: true
-
 - name: Install Packages
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
-
-- name: Set Minimum Unprivileged Port
-  ansible.posix.sysctl:
-    name: net.ipv4.ip_unprivileged_port_start
-    value: 80
-    state: present
-    sysctl_set: true
-    reload: true
-    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
+    update_cache: true
+    cache_valid_time: 3600
 
 - name: Enable Tuned Service
   ansible.builtin.service:
@@ -30,7 +19,7 @@
 
 - name: Set Tuned Profile
   ansible.builtin.command: tuned-adm profile {{ common_tuned_profile }}
-  when: common_tuned_profile not in common_tuned_active.stdout
+  when: common_tuned_active.stdout.split(':')[-1] | trim != common_tuned_profile
   changed_when: true
 
 - name: Ensure journald.conf.d Directory
@@ -52,14 +41,61 @@
       SystemMaxUse={{ common_journald_maxuse }}
   notify: Restart Journald
 
-- name: Configure Base Firewall Rules
+# ROCm is in the llama-server image; the host needs only the kernel driver and the TTM limit
+- name: Set TTM Pages Limit
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/ttm.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      options ttm pages_limit={{ common_ttm_pages_limit }}
+  notify: TTM Changed
+
+# the apt timers read these files on each run, so no restart is needed
+- name: Configure APT Periodic Updates
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Download-Upgradeable-Packages "1";
+      APT::Periodic::AutocleanInterval "7";
+      APT::Periodic::Unattended-Upgrade "1";
+
+- name: Configure Unattended-Upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      Unattended-Upgrade::Origins-Pattern {
+          "origin=Ubuntu,archive=${distro_codename}-security,label=Ubuntu";
+      };
+
+      Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+      Unattended-Upgrade::Remove-New-Unused-Dependencies "true";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+      Unattended-Upgrade::Automatic-Reboot "{{ common_unattended_reboot | lower }}";
+      Unattended-Upgrade::Automatic-Reboot-WithUsers "true";
+      Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+
+- name: Allow SSH
   community.general.ufw:
     rule: allow
     port: "22"
     proto: tcp
 
-- name: Configure and Enable Firewall Defaults
+- name: Enable Firewall with Default Deny
   community.general.ufw:
     default: deny
     direction: incoming
     state: enabled
+
+# rebuild the initramfs now: queued handlers are lost if a later task fails
+- name: Apply Pending Handlers
+  ansible.builtin.meta: flush_handlers

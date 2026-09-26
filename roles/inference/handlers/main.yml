@@ -1,9 +1,9 @@
 ---
 - name: Restart Inference
   become: true
-  become_user: "{{ common_service_account.name }}"
+  become_user: "{{ inference_user }}"
   ansible.builtin.systemd:
-    name: "{{ inference_server.name }}.service"
+    name: llamacpp-server.service
     scope: user
     daemon_reload: true
     state: restarted
