@@ -28,7 +28,6 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 ARG LLAMA_REF
-ARG GPU_TARGET=gfx1151
 WORKDIR /src
 RUN test -n "${LLAMA_REF}" || { echo "ERROR: LLAMA_REF build arg is required"; exit 1; } \
   && git clone --depth 1 --branch "${LLAMA_REF}" https://github.com/ggml-org/llama.cpp.git .
@@ -39,7 +38,7 @@ RUN HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" cmake -S . -B buil
     -DCMAKE_INSTALL_PREFIX=/opt/llama \
     -DCMAKE_INSTALL_RPATH=/opt/llama/lib \
     -DGGML_HIP=ON \
-    -DGPU_TARGETS="${GPU_TARGET}" \
+    -DGPU_TARGETS=gfx1151 \
     -DGGML_HIP_ROCWMMA_FATTN=ON \
     -DLLAMA_BUILD_TESTS=OFF \
     -DLLAMA_BUILD_EXAMPLES=OFF \
