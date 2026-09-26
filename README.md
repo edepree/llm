@@ -41,15 +41,24 @@ Only `models_max` model(s) are resident at once (default `1`); requesting anothe
 
 ## Managing the Service
 
-The service runs as a systemd user service under `common_service_account.name` (`llm` by default), which has no password or SSH key. From the admin account:
+The service runs as a systemd user service under `common_service_account.name` (`llm` by default), which has no password or SSH key. Lingering keeps its user manager running without a login, and the manager provides `XDG_RUNTIME_DIR` to the service itself, so nothing needs it in `.bashrc`.
+
+From the admin account, target the account's user manager directly:
 
 ```bash
-alias llm='sudo -u llm XDG_RUNTIME_DIR=/run/user/$(id -u llm)'
-llm systemctl --user status llamacpp-server.service
-llm systemctl --user restart llamacpp-server.service
-llm journalctl --user -u llamacpp-server.service -f
-llm podman images localhost/llama-server
+sudo systemctl --user -M llm@ status llamacpp-server.service
+sudo systemctl --user -M llm@ restart llamacpp-server.service
+sudo journalctl --user -M llm@ -u llamacpp-server.service -f
 ```
+
+For an interactive shell as `llm` (e.g. to run `podman`), open a real login session:
+
+```bash
+sudo machinectl shell llm@
+podman images localhost/llama-server
+```
+
+`sudo -u llm` and `su - llm` do not open a login session, so `XDG_RUNTIME_DIR` is unset and `systemctl --user` / `podman` talk to the wrong (or no) runtime directory.
 
 ## Architecture
 
@@ -76,13 +85,13 @@ A new tag builds a new image and restarts the service; older images stay on the 
 
 **Roll back:** set `llama_ref` back to the previous tag and rerun. The old image is still local, so nothing is rebuilt — unless the Containerfile changed in between, which triggers a rebuild of that tag.
 
-**Disk:** each build leaves an untagged builder image with the full ROCm toolchain (many GB). Clean up as `llm` with `podman image prune -f`, and remove old tags with `podman image rm localhost/llama-server:<tag>`.
+**Disk:** each build leaves an untagged builder image with the full ROCm toolchain (many GB). Clean up in `sudo machinectl shell llm@` with `podman image prune -f`, and remove old tags with `podman image rm localhost/llama-server:<tag>`.
 
 ## Roles Reference
 
 | Role | Tags | Purpose |
 |------|------|---------|
-| `common` | `common`, `system` | APT cache, packages (podman, tuned, ufw), unprivileged port 80, tuned profile, journald limits, base firewall |
+| `common` | `common`, `system` | APT cache, packages (podman, systemd-container, tuned, ufw), unprivileged port 80, tuned profile, journald limits, base firewall |
 | `service_account` | `accounts` | Creates the service account with `render`/`video` groups and enables lingering |
 | `system_hardening` | `hardening`, `updates` | Unattended upgrades, Ubuntu security pocket only |
 | `rocm` | `rocm`, `gpu` | TTM pages limit + initramfs rebuild (no ROCm packages on the host) |
