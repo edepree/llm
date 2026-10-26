@@ -1,7 +1,7 @@
 ---
 common_packages:
   - acl
-  - curl # Multipart uploads in the STT checks
+  - curl # multipart uploads in the STT checks
   - libxrt-utils-npu # xrt-smi for NPU status and firmware version
   - nvtop
   - podman
@@ -10,7 +10,7 @@ common_packages:
   - ufw
   - unattended-upgrades
 
-# Held with linux-firmware because the containers bundle XRT and ROCm user space that must match the host driver and firmware
+# held with linux-firmware because the containers bundle XRT and ROCm user space that must match the host driver and firmware
 common_kernel_packages:
   - linux-generic
   - linux-generic-hwe-26.04

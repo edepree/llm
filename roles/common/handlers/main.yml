@@ -11,7 +11,7 @@
   changed_when: true
   listen: TTM Changed
 
-# The kernel command line comes from grub.cfg, so regenerate it after a grub.d file changes
+# kernel command line comes from grub.cfg, so regenerate it after a grub.d file changes
 - name: Update GRUB
   ansible.builtin.command: update-grub
   changed_when: true

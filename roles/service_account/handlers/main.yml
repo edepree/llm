@@ -1,5 +1,5 @@
 ---
-# The user manager reads limits only at start. Stopping user-runtime-dir@ also stops user@ and clears
+# the user manager reads limits only at start. Stopping user-runtime-dir@ also stops user@ and clears
 # /run/user/<uid>, since a bare user@ restart leaves rootless podman pointing at its killed pause process
 - name: Stop User Manager and Runtime Directory
   ansible.builtin.systemd_service:

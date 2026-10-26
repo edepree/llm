@@ -62,7 +62,7 @@
     ulimit:
       - memlock=-1:-1
     env:
-      FLM_DISABLE_UPDATE_CHECK: "1" # Skip the version check against GitHub at every start
+      FLM_DISABLE_UPDATE_CHECK: "1" # skip the version check against GitHub at every start
     command: serve --asr 1 --host 0.0.0.0
     state: quadlet
     quadlet_options:
@@ -81,7 +81,7 @@
     daemon_reload: true
     state: started
 
-# The first start downloads the Whisper model (620 MB). curl because uri base64-encodes file parts
+# the first start downloads the Whisper model (620 MB). curl because uri base64-encodes file parts
 - name: Wait for STT
   ansible.builtin.command:
     argv:

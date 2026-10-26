@@ -12,7 +12,7 @@
     service_account_home: "{{ service_account_result.home }}"
     service_account_uid: "{{ service_account_result.uid }}"
 
-# Rootless containers cannot raise memlock above the account's limit
+# rootless containers cannot raise memlock above the account's limit
 - name: Allow Unlimited Locked Memory for the NPU
   ansible.builtin.copy:
     dest: /etc/security/limits.d/90-{{ service_account_user }}-memlock.conf
@@ -23,7 +23,7 @@
       {{ service_account_user }} - memlock unlimited
   notify: Restart User Manager
 
-# Before any service starts because the restart stops every service of the account
+# flush before any service starts because the restart stops every service of the account
 - name: Apply Memlock Limit
   ansible.builtin.meta: flush_handlers
 
@@ -32,7 +32,7 @@
   args:
     creates: /var/lib/systemd/linger/{{ service_account_user }}
 
-# All services join this network and reach each other by container name
+# all services join this network and reach each other by container name
 - name: Deploy Quadlet for llm Network
   become: true
   become_user: "{{ service_account_user }}"

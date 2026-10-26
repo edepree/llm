@@ -27,7 +27,7 @@
     mode: "0644"
   notify: Restart Inference
 
-# Builds only when the tag is missing or the Containerfile changed, and a build takes 20-40 minutes
+# builds only when the tag is missing or the Containerfile changed
 - name: Build llama-server Image
   become: true
   become_user: "{{ service_account_user }}"
@@ -37,7 +37,7 @@
     build:
       extra_args: --build-arg LLAMA_REF={{ inference_llama_ref }}
     state: present
-  async: 3600 # The build continues if the SSH connection drops
+  async: 3600 # the build continues if the SSH connection drops
   poll: 30
   notify: Restart Inference
 
@@ -59,7 +59,7 @@
     name: llamacpp-server
     image: "{{ inference_image }}"
     publish:
-      - 127.0.0.1:8080:8080/tcp # Bifrost is the LAN entry point
+      - 127.0.0.1:8080:8080/tcp # model router is the LAN entry point
     network:
       - llm.network
     volume:
@@ -75,12 +75,12 @@
     command: >-
       --models-preset /models-preset.ini --models-max {{ inference_models_max }}
       --host 0.0.0.0 --port 8080
-    # Probes only the router process, not the model children on their own ports
+    # probes only the router process, not the model children on their own ports
     healthcheck: curl -sf -m 10 http://127.0.0.1:8080/health
     healthcheck_interval: 30s
     healthcheck_timeout: 15s
     healthcheck_retries: 3
-    healthcheck_failure_action: kill # Restart=on-failure then starts the exited container
+    healthcheck_failure_action: kill # restart=on-failure then starts the exited container
     state: quadlet
     quadlet_options:
       - "{{ service_account_quadlet_options }}"
@@ -89,7 +89,7 @@
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
 
-# No enabled because Quadlet units are generated and [Install] WantedBy starts them at boot
+# started, not enabled, because Quadlet units are generated and [Install] WantedBy starts them at boot
 - name: Start llama-server
   become: true
   become_user: "{{ service_account_user }}"
