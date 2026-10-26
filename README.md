@@ -43,14 +43,14 @@ cat /sys/module/ttm/parameters/pages_limit   # equals common_ttm_pages_limit
 |---------|------|-------------|
 | SSH | 22 | Remote access |
 | Bifrost | 80 | OpenAI-compatible API (`/v1`) + Bifrost dashboard (`/`) |
-| Open WebUI | 3000 | Chat in the browser, through Bifrost |
-| llama-server | 127.0.0.1:8080 | Backend; API and built-in Web UI on the host only |
+| Open WebUI | 80 | Chat in the browser, through Bifrost |
+| llama-server | 127.0.0.1:8081 | Backend; API and built-in Web UI on the host only |
 | flm-asr | 127.0.0.1:52625 | Backend; speech-to-text on the host only |
 
-The API is at `http://<target>/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`) and `flm/whisper-v3` for `/v1/audio/transcriptions`. To list them, run `curl http://<target>/v1/models`. The `flm/` list includes every FastFlowLM model, but only `flm/whisper-v3` is loaded.
+The API is at `http://<target>:8080/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`) and `flm/whisper-v3` for `/v1/audio/transcriptions`. To list them, run `curl http://<target>:8080/v1/models`. FastFlowLM's models are left out of the list, since FastFlowLM lists only its chat models and not `flm/whisper-v3`, which still works when called by name.
 
 ```bash
-curl http://<target>/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 -F language=en
+curl http://<target>:8080/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 -F language=en
 ```
 
 Set `language` when you know it: without it Whisper detects the language and can add made-up text at trailing silence.
@@ -59,11 +59,11 @@ Long audio is limited by upload size first: Bifrost accepts at most 100 MB per r
 
 At most `inference_models_max` models are loaded at once (default `1`). A request for another model unloads the least recently used idle model. The API has no key, so use it only on a trusted network.
 
-The Bifrost dashboard at `http://<target>/` shows request logs. Log in as `admin` with the password in `credentials/bifrost-admin` on the machine that ran the playbook (generated on the first run, gitignored).
+The Bifrost dashboard at `http://<target>:8080/` shows request logs. Log in as `admin` with the password in `credentials/bifrost-admin` on the machine that ran the playbook (generated on the first run, gitignored).
 
 ### Open WebUI
 
-Open the chat at `http://<target>:3000`. It has no login: everyone on the network shares one user and its chat history, kept in the volume `open-webui-data`. Turning login on later requires deleting that volume. Its chats go through Bifrost, so they appear in the Bifrost logs. The connection to Bifrost is stored in its database on first start; change it later under Admin Settings → Connections.
+Open the chat at `http://<target>`. It has no login: everyone on the network shares one user and its chat history, kept in the volume `open-webui-data`. Turning login on later requires deleting that volume. Its chats go through Bifrost, so they appear in the Bifrost logs. The connection to Bifrost is stored in its database on first start; change it later under Admin Settings → Connections.
 
 ### Home Assistant
 
@@ -74,7 +74,7 @@ Home Assistant uses its built-in **OpenAI** integration for speech-to-text. The 
    ```yaml
    env:
      - name: OPENAI_BASE_URL
-       value: "http://<target>/v1"
+       value: "http://<target>:8080/v1"
    ```
 
 2. Under Settings → Devices & services, add the **OpenAI** integration. Enter any API key: Bifrost ignores it, but the field is required.
@@ -86,7 +86,7 @@ The variable applies to the whole Home Assistant process: every OpenAI-based int
 A short command takes about 2 s to transcribe: Whisper always processes a 30 s window. Requests are handled one at a time. To send the same request Home Assistant sends:
 
 ```bash
-curl http://<target>/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 \
+curl http://<target>:8080/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 \
   -F language=en -F response_format=json -F prompt="Home Assistant voice command"
 ```
 
@@ -115,9 +115,9 @@ podman images localhost/llama-server
 
 ```mermaid
 flowchart LR
-    CLIENT["API client"] --> BIFROST["bifrost\nport 80 → 8080"]
+    CLIENT["API client"] --> BIFROST["bifrost\nport 8080"]
     HA["Home Assistant"] --> BIFROST
-    BROWSER["Browser"] --> WEBUI["open-webui\nport 3000 → 8080"]
+    BROWSER["Browser"] --> WEBUI["open-webui\nport 80 → 8080"]
     WEBUI --> BIFROST
     BIFROST --> LLAMA["llamacpp-server\n:8080"]
     BIFROST --> FLM["flm-asr\n:52625"]
@@ -170,7 +170,7 @@ sudo reboot
 # then re-run the playbook: it re-applies the hold and checks the GPU and NPU from the containers
 ```
 
-`nvtop` shows GPU load and memory. `xrt-smi examine` shows the NPU and its firmware version.
+`nvtop` shows GPU load and memory. `sudo nethogs` shows network traffic per process (rootless container traffic shows up under `pasta`). `xrt-smi examine` shows the NPU and its firmware version.
 
 ## Roles Reference
 
@@ -213,9 +213,9 @@ Keys are llama.cpp CLI arguments without leading dashes (see the [model presets 
 | `inference_llama_ref` | `v0.7.0` | llama.cpp git tag built into the image |
 | `inference_models_max` | `1` | Models loaded at once |
 | `stt_flm_version` | `1.0.10` | FastFlowLM release built into the image |
-| `router_port` | `80` | Host port for Bifrost |
+| `router_port` | `8080` | Host port for Bifrost |
 | `router_bifrost_image` | `docker.io/maximhq/bifrost:v2.3.2` | Bifrost image |
-| `router_webui_port` | `3000` | Host port for Open WebUI |
+| `router_webui_port` | `80` | Host port for Open WebUI |
 | `router_webui_image` | `ghcr.io/open-webui/open-webui:v0.12.3` | Open WebUI image |
 | `router_stt_timeout` | `300` | Seconds Bifrost waits for a transcription |
 | `router_chat_timeout` | `900` | Seconds Bifrost waits for a non-streaming chat or completion |

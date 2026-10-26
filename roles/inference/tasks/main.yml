@@ -59,7 +59,7 @@
     name: llamacpp-server
     image: "{{ inference_image }}"
     publish:
-      - 127.0.0.1:8080:8080/tcp # model router is the LAN entry point
+      - 127.0.0.1:8081:8080/tcp # model router is the LAN entry point
     network:
       - llm.network
     volume:
@@ -101,7 +101,7 @@
 
 - name: Wait for llama-server Health
   ansible.builtin.uri:
-    url: http://127.0.0.1:8080/health
+    url: http://127.0.0.1:8081/health
   register: inference_health
   until: inference_health.status == 200
   retries: 30

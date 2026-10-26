@@ -1,6 +1,6 @@
 ---
-router_port: 80
-router_webui_port: 3000
+router_port: 8080
+router_webui_port: 80
 router_bifrost_image: docker.io/maximhq/bifrost:v2.3.2
 router_webui_image: ghcr.io/open-webui/open-webui:v0.12.3
 # Seconds, including time queued behind another request since FLM handles one at a time

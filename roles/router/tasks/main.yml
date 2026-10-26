@@ -1,11 +1,11 @@
 ---
 # Rootless podman binds the host port as the service account
-- name: Allow Unprivileged Bind to Router Port
+- name: Allow Unprivileged Bind to Router Ports
   ansible.posix.sysctl:
     name: net.ipv4.ip_unprivileged_port_start
-    value: "{{ router_port }}"
+    value: "{{ [router_port, router_webui_port] | min }}"
     sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
-  when: router_port < 1024
+  when: ([router_port, router_webui_port] | min) < 1024
 
 - name: Create Bifrost Config Directory
   ansible.builtin.file:
@@ -108,7 +108,7 @@
   until: >-
     router_models.status == 200
     and router_models.json.data | selectattr('id', 'match', 'llamacpp/') | list | length > 0
-    and router_models.json.data | selectattr('id', 'match', 'flm/') | list | length > 0
+    and router_models.json.data | selectattr('id', 'match', 'flm/') | list | length == 0
   retries: 30
   delay: 10
 
