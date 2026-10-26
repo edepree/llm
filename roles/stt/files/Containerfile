@@ -1,5 +1,5 @@
-# FastFlowLM for the AMD XDNA 2 NPU. XRT comes from Ubuntu universe as a package dependency,
-# so the host needs only the amdxdna kernel driver and NPU firmware.
+# XRT comes from Ubuntu universe as a package dependency, so the host needs only the amdxdna
+# kernel driver and NPU firmware
 
 FROM docker.io/library/ubuntu:26.04
 ARG FLM_VERSION

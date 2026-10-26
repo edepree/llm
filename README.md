@@ -10,7 +10,7 @@ The playbook runs five rootless Podman Quadlet user services:
 - `wyoming-openai`: [Wyoming](https://github.com/roryeckel/wyoming_openai) bridge so Home Assistant can use the speech-to-text
 - `open-webui`: [Open WebUI](https://github.com/open-webui/open-webui) chat front end that talks to Bifrost
 
-ROCm and XRT are only in the images. The host needs the kernel drivers and firmware, the TTM memory limit, Podman, and unlimited locked memory for the service account (the `stt` role sets it).
+ROCm and XRT are only in the images. The host needs the kernel drivers and firmware, the TTM memory limit, Podman, and unlimited locked memory for the service account (the `service_account` role sets it).
 
 ## Quick Start
 
@@ -142,13 +142,13 @@ A new tag builds a new image and restarts the service. Older images stay on the 
 
 Set `stt_flm_version` in `roles/stt/defaults/main.yml` to a [FastFlowLM release](https://github.com/ROCm/FastFlowLM/releases) that ships an `ubuntu26.04` package, then run the playbook with `--tags stt`. The play builds a new image, checks that the container sees the NPU, and transcribes a test clip.
 
-The NPU needs the IOMMU (the `common` role fails if `amd_iommu=off` is set), the `render` group for `/dev/accel/accel0`, and unlimited locked memory. A rootless container cannot raise that limit above its account's, so the `stt` role writes `/etc/security/limits.d/90-<service_account_user>-memlock.conf` and restarts the account's user manager (`user@<uid>.service`) when that file changes. That restart stops and restarts every service of the account, so in-flight chat and speech requests fail and `machinectl shell` sessions end. It happens on the first run, or after the file is changed. The container runs with an init process because `flm` ignores SIGTERM as PID 1.
+The NPU needs the IOMMU (the `common` role fails if `amd_iommu=off` is set), the `render` group for `/dev/accel/accel0`, and unlimited locked memory. A rootless container cannot raise that limit above its account's, so the `service_account` role writes `/etc/security/limits.d/90-<service_account_user>-memlock.conf` and restarts the account's user manager (`user@<uid>.service`) when that file changes. That restart stops and restarts every service of the account, so in-flight chat and speech requests fail and `machinectl shell` sessions end. It happens when the file is changed, or on the first run of a host that already runs the services. The container runs with an init process because `flm` ignores SIGTERM as PID 1.
 
 FastFlowLM's NPU kernels are closed source, free to use and redistribute under the FastFlowLM NPU Binary License. Powered by [FastFlowLM](https://github.com/ROCm/FastFlowLM).
 
 ## Kernel and Firmware Upgrades
 
-The containers bring their own ROCm and XRT user space, which must match the host's `amdgpu`/`amdxdna` drivers and firmware. The `common` role therefore holds `linux-firmware` and the installed kernel metapackage from `common_held_packages` (`linux-generic`, `linux-generic-hwe-26.04` or `linux-oem-26.04`), and unattended upgrades leave them alone. The role fails if none of these kernel metapackages is installed. To upgrade them:
+The containers bring their own ROCm and XRT user space, which must match the host's `amdgpu`/`amdxdna` drivers and firmware. The `common` role therefore holds `linux-firmware` and the installed kernel metapackage from `common_kernel_packages` (`linux-generic`, `linux-generic-hwe-26.04` or `linux-oem-26.04`), and unattended upgrades leave them alone. The role fails if none of these kernel metapackages is installed. To upgrade them:
 
 ```bash
 apt-mark showhold
@@ -165,9 +165,9 @@ sudo reboot
 | Role | Tags | Purpose |
 |------|------|---------|
 | `common` | `common` | IOMMU check, packages, kernel and firmware hold, tuned profile, journald limits, TTM pages limit and initramfs rebuild (no ROCm on the host), unattended security upgrades, base firewall |
-| `service_account` | (dependency) | Service account (`render`/`video`, lingering), `llm.network`. Runs with each of the roles below |
+| `service_account` | (dependency) | Service account (`render`/`video`, lingering, memlock limit), `llm.network`. Runs with each of the roles below |
 | `inference` | `inference` | llama-server image build, GPU check, preset file, Quadlet, health check |
-| `stt` | `stt` | Memlock limit for the service account (restarts its user manager when changed), FastFlowLM image build, NPU check, Quadlet, transcription check |
+| `stt` | `stt` | FastFlowLM image build, NPU check, Quadlet, transcription check |
 | `router` | `router` | Bifrost config and Quadlet, Wyoming bridge and Open WebUI Quadlets, unprivileged port, firewall, end-to-end checks. Needs `inference` and `stt` deployed first |
 
 ## Configuration
@@ -210,7 +210,7 @@ Keys are llama.cpp CLI arguments without leading dashes (see the [model presets 
 | `router_stt_timeout` | `300` | Seconds Bifrost waits for a transcription |
 | `router_chat_timeout` | `900` | Seconds Bifrost waits for a non-streaming chat or completion |
 | `service_account_user` | `llm` | Account that owns and runs the services |
-| `common_held_packages` | `linux-firmware`, kernel metapackages | Packages held against upgrades, if installed |
+| `common_kernel_packages` | kernel metapackages | Held against upgrades with `linux-firmware`, if installed |
 | `common_ttm_pages_limit` | `26214400` | TTM pages limit (GPU-addressable system memory) |
 | `common_tuned_profile` | `throughput-performance` | `tuned` profile |
 | `common_unattended_reboot` | `false` | Allow unattended reboots at 03:00 |

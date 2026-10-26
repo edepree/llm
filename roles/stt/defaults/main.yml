@@ -1,4 +1,3 @@
 ---
-# FastFlowLM release to build; change it to upgrade or roll back
 stt_flm_version: 1.0.10
 stt_image: "localhost/flm:{{ stt_flm_version }}"

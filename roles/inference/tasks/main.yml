@@ -27,7 +27,7 @@
     mode: "0644"
   notify: Restart Inference
 
-# builds when the tag is missing or the Containerfile changed; a build takes 20-40 minutes
+# Builds only when the tag is missing or the Containerfile changed, and a build takes 20-40 minutes
 - name: Build llama-server Image
   become: true
   become_user: "{{ service_account_user }}"
@@ -37,7 +37,7 @@
     build:
       extra_args: --build-arg LLAMA_REF={{ inference_llama_ref }}
     state: present
-  async: 3600 # the build continues if the SSH connection drops
+  async: 3600 # The build continues if the SSH connection drops
   poll: 30
   notify: Restart Inference
 
@@ -75,28 +75,21 @@
     command: >-
       --models-preset /models-preset.ini --models-max {{ inference_models_max }}
       --host 0.0.0.0 --port 8080
-    # probes the router process only; model children run on their own ports and are not checked
+    # Probes only the router process, not the model children on their own ports
     healthcheck: curl -sf -m 10 http://127.0.0.1:8080/health
     healthcheck_interval: 30s
     healthcheck_timeout: 15s
     healthcheck_retries: 3
-    healthcheck_failure_action: kill # the container exits, then Restart=on-failure starts it again
+    healthcheck_failure_action: kill # Restart=on-failure then starts the exited container
     state: quadlet
     quadlet_options:
-      - |
-        [Service]
-        Restart=on-failure
-        RestartSec=10
-
-        [Install]
-        WantedBy=default.target
+      - "{{ service_account_quadlet_options }}"
   notify: Restart Inference
 
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
 
-# starts the service if it is stopped; no change after a handler restart.
-# no enabled: Quadlet units are generated, [Install] WantedBy starts them at boot
+# No enabled because Quadlet units are generated and [Install] WantedBy starts them at boot
 - name: Start llama-server
   become: true
   become_user: "{{ service_account_user }}"

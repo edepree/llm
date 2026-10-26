@@ -15,17 +15,21 @@
 - name: Gather Package Facts
   ansible.builtin.package_facts:
 
-- name: Verify a Held Kernel Metapackage Is Installed
-  ansible.builtin.assert:
-    that: common_held_packages | reject('equalto', 'linux-firmware') | select('in', ansible_facts['packages']) | list | length > 0
-    fail_msg: "None of {{ common_held_packages }} is installed; add the host's kernel metapackage to common_held_packages"
+- name: Find Installed Kernel Metapackages
+  ansible.builtin.set_fact:
+    common_installed_kernels: "{{ common_kernel_packages | select('in', ansible_facts['packages']) | list }}"
 
-# upgrade these deliberately, then re-run the playbook so its GPU and NPU checks verify the pair
+- name: Verify a Kernel Metapackage Is Installed
+  ansible.builtin.assert:
+    that: common_installed_kernels | length > 0
+    fail_msg: "None of {{ common_kernel_packages }} is installed; add the host's kernel metapackage to common_kernel_packages"
+
+# Upgrade these deliberately, then re-run the playbook so its GPU and NPU checks verify the pair
 - name: Hold Kernel and Firmware
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
-  loop: "{{ common_held_packages | select('in', ansible_facts['packages']) | list }}"
+  loop: "{{ ['linux-firmware'] + common_installed_kernels }}"
 
 - name: Enable Tuned Service
   ansible.builtin.service:
@@ -62,7 +66,6 @@
       SystemMaxUse={{ common_journald_maxuse }}
   notify: Restart Journald
 
-# ROCm is in the llama-server image; the host needs only the kernel driver and the TTM limit
 - name: Set TTM Pages Limit
   ansible.builtin.copy:
     dest: /etc/modprobe.d/ttm.conf
@@ -73,7 +76,7 @@
       options ttm pages_limit={{ common_ttm_pages_limit }}
   notify: TTM Changed
 
-# the apt timers read these files on each run, so no restart is needed
+# The apt timers read these files on each run, so no restart is needed
 - name: Configure APT Periodic Updates
   ansible.builtin.copy:
     dest: /etc/apt/apt.conf.d/20auto-upgrades
@@ -117,6 +120,6 @@
     direction: incoming
     state: enabled
 
-# rebuild the initramfs now: queued handlers are lost if a later task fails
+# Rebuild the initramfs now because queued handlers are lost if a later task fails
 - name: Apply Pending Handlers
   ansible.builtin.meta: flush_handlers

@@ -1,2 +1,9 @@
 ---
 service_account_user: llm
+service_account_quadlet_options: |
+  [Service]
+  Restart=on-failure
+  RestartSec=10
+
+  [Install]
+  WantedBy=default.target

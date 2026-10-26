@@ -1,19 +1,17 @@
 ---
 common_packages:
   - acl
-  - curl # multipart uploads in the STT checks
-  - libxrt-utils-npu # xrt-smi: NPU status and firmware version
-  - nvtop # GPU load and memory
+  - curl # Multipart uploads in the STT checks
+  - libxrt-utils-npu # xrt-smi for NPU status and firmware version
+  - nvtop
   - podman
-  - systemd-container # provides machinectl and journalctl -M
+  - systemd-container # machinectl and journalctl -M
   - tuned
   - ufw
   - unattended-upgrades
 
-# the containers bundle XRT and ROCm user space, which must match the host driver and firmware.
-# Only the installed ones are held; at least one kernel metapackage must be installed
-common_held_packages:
-  - linux-firmware
+# Held with linux-firmware because the containers bundle XRT and ROCm user space that must match the host driver and firmware
+common_kernel_packages:
   - linux-generic
   - linux-generic-hwe-26.04
   - linux-oem-26.04
@@ -22,7 +20,7 @@ common_tuned_profile: throughput-performance
 
 common_journald_maxuse: 1G
 
-# GPU-addressable system memory, in 4 KiB pages
+# GPU-addressable system memory in 4 KiB pages
 common_ttm_pages_limit: 26214400
 
 common_unattended_reboot: false

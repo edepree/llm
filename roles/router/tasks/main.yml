@@ -1,5 +1,5 @@
 ---
-# rootless podman binds the host port as the service account
+# Rootless podman binds the host port as the service account
 - name: Allow Unprivileged Bind to Router Port
   ansible.posix.sysctl:
     name: net.ipv4.ip_unprivileged_port_start
@@ -24,7 +24,7 @@
     mode: "0644"
   notify: Restart Bifrost
 
-# config.db and logs.db live in the volume; config.json is applied over them at every start
+# config.db and logs.db live in the volume, and config.json is applied over them at every start
 - name: Deploy Quadlet for Bifrost
   become: true
   become_user: "{{ service_account_user }}"
@@ -46,14 +46,8 @@
         [Unit]
         Wants=llamacpp-server.service flm-asr.service
         After=llamacpp-server.service flm-asr.service
-
-        [Service]
-        Restart=on-failure
-        RestartSec=10
-
-        [Install]
-        WantedBy=default.target
-  no_log: true # the env holds the admin password
+      - "{{ service_account_quadlet_options }}"
+  no_log: true # The env holds the admin password
   notify: Restart Bifrost
 
 - name: Deploy Quadlet for Wyoming Bridge
@@ -69,23 +63,17 @@
     env:
       STT_OPENAI_URL: http://bifrost:8080/v1
       STT_MODELS: flm/whisper-v3
-      STT_OPENAI_KEY: none # the client library requires a key; Bifrost ignores it
+      STT_OPENAI_KEY: none # The client library requires a key that Bifrost ignores
     state: quadlet
     quadlet_options:
       - |
         [Unit]
         Wants=bifrost.service
         After=bifrost.service
-
-        [Service]
-        Restart=on-failure
-        RestartSec=10
-
-        [Install]
-        WantedBy=default.target
+      - "{{ service_account_quadlet_options }}"
   notify: Restart Wyoming Bridge
 
-# the OPENAI_* and ENABLE_OLLAMA_API values are stored in its database on first start; later changes are made in its admin settings
+# Open WebUI stores OPENAI_* and ENABLE_OLLAMA_API in its database on first start, so later changes go through its admin settings
 - name: Deploy Quadlet for Open WebUI
   become: true
   become_user: "{{ service_account_user }}"
@@ -102,20 +90,14 @@
       OPENAI_API_BASE_URL: http://bifrost:8080/v1
       OPENAI_API_KEY: none
       ENABLE_OLLAMA_API: "False"
-      WEBUI_AUTH: "False" # single shared user; cannot be turned on later without wiping open-webui-data
+      WEBUI_AUTH: "False" # Single shared user, enabling auth later requires wiping open-webui-data
     state: quadlet
     quadlet_options:
       - |
         [Unit]
         Wants=bifrost.service
         After=bifrost.service
-
-        [Service]
-        Restart=on-failure
-        RestartSec=10
-
-        [Install]
-        WantedBy=default.target
+      - "{{ service_account_quadlet_options }}"
   notify: Restart Open WebUI
 
 - name: Allow Router Ports
@@ -147,7 +129,6 @@
 - name: Wait for Router
   ansible.builtin.uri:
     url: http://127.0.0.1:{{ router_port }}/v1/models
-    return_content: true
   register: router_models
   until: >-
     router_models.status == 200
@@ -170,7 +151,7 @@
   changed_when: false
   failed_when: "'fellow Americans' not in router_stt.stdout"
 
-# Wyoming is newline-delimited JSON; the describe reply names the advertised ASR models
+# Wyoming is newline-delimited JSON, and the describe reply names the advertised ASR models
 - name: Verify Wyoming Bridge
   ansible.builtin.command:
     argv:
@@ -194,7 +175,7 @@
   delay: 5
   until: router_wyoming is not failed
 
-# the first start downloads its embedding model, so allow a few minutes
+# The first start downloads its embedding model, so allow a few minutes
 - name: Wait for Open WebUI
   ansible.builtin.uri:
     url: http://127.0.0.1:{{ router_webui_port }}/health

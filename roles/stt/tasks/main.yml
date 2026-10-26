@@ -1,19 +1,4 @@
 ---
-# rootless containers cannot raise memlock above the account's limit. pam_limits applies it to
-# become sessions and to the user manager that runs the Quadlets
-- name: Allow Unlimited Locked Memory for the NPU
-  ansible.builtin.copy:
-    dest: /etc/security/limits.d/90-{{ service_account_user }}-memlock.conf
-    owner: root
-    group: root
-    mode: "0644"
-    content: |
-      {{ service_account_user }} - memlock unlimited
-  notify: Restart User Manager
-
-- name: Apply Memlock Limit
-  ansible.builtin.meta: flush_handlers
-
 - name: Create STT Build Directory
   ansible.builtin.file:
     path: "{{ service_account_home }}/build/flm"
@@ -31,7 +16,7 @@
     mode: "0644"
   loop:
     - Containerfile
-    - short.wav # test clip for the transcription checks
+    - short.wav
 
 - name: Build FastFlowLM Image
   become: true
@@ -56,7 +41,7 @@
     'NPU: /dev/accel/accel0' not in stt_validate.stdout
     or 'Memlock Limit: infinity' not in stt_validate.stdout
 
-# flm ignores SIGTERM as PID 1; the init process forwards it so the container stops at once
+# flm ignores SIGTERM as PID 1, so the init process forwards it
 - name: Deploy Quadlet for flm-asr
   become: true
   become_user: "{{ service_account_user }}"
@@ -77,17 +62,11 @@
     ulimit:
       - memlock=-1:-1
     env:
-      FLM_DISABLE_UPDATE_CHECK: "1" # skip the version check against GitHub at every start
+      FLM_DISABLE_UPDATE_CHECK: "1" # Skip the version check against GitHub at every start
     command: serve --asr 1 --host 0.0.0.0
     state: quadlet
     quadlet_options:
-      - |
-        [Service]
-        Restart=on-failure
-        RestartSec=10
-
-        [Install]
-        WantedBy=default.target
+      - "{{ service_account_quadlet_options }}"
   notify: Restart STT
 
 - name: Apply Pending Restarts
@@ -102,7 +81,7 @@
     daemon_reload: true
     state: started
 
-# the first start downloads the Whisper model (620 MB). curl, not uri: uri base64-encodes file parts
+# The first start downloads the Whisper model (620 MB). curl because uri base64-encodes file parts
 - name: Wait for STT
   ansible.builtin.command:
     argv:
