@@ -75,6 +75,12 @@
     command: >-
       --models-preset /models-preset.ini --models-max {{ inference_models_max }}
       --host 0.0.0.0 --port 8080
+    # probes the router process only; model children run on their own ports and are not checked
+    healthcheck: curl -sf -m 10 http://127.0.0.1:8080/health
+    healthcheck_interval: 30s
+    healthcheck_timeout: 15s
+    healthcheck_retries: 3
+    healthcheck_failure_action: kill # the container exits, then Restart=on-failure starts it again
     state: quadlet
     quadlet_options:
       - |
@@ -94,7 +100,7 @@
 - name: Start llama-server
   become: true
   become_user: "{{ service_account_user }}"
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     name: llamacpp-server.service
     scope: user
     daemon_reload: true

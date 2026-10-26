@@ -120,6 +120,7 @@ All containers join the Quadlet network `llm.network` and reach each other by co
 1. `roles/inference/files/Containerfile` has two stages. The builder stage compiles llama.cpp at `inference_llama_ref` for `gfx1151` with ROCm's clang. The runtime stage contains only the ROCm runtime and the llama.cpp binaries.
 2. The image tag is `localhost/llama-server:<llama_ref>-rocm10.0`. The playbook builds the image when the tag does not exist or when the Containerfile changed. A rebuild replaces the existing tag.
 3. The playbook checks that the container can use the GPU (`llama-server --list-devices` must list `ROCm0`), deploys the Quadlet, and waits until `/health` returns 200.
+4. Podman checks `/health` every 30 s. After 3 failures it kills the container, and systemd starts it again. The check reaches only the router process, so it does not catch a stuck model process.
 
 ## Upgrading and Rolling Back llama.cpp
 
