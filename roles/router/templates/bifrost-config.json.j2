@@ -1,0 +1,54 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "source_of_truth": "config.json",
+  "client": {
+    "enforce_auth_on_inference": false
+  },
+  "governance": {
+    "auth_config": {
+      "is_enabled": true,
+      "admin_username": "admin",
+      "admin_password": "env.BIFROST_ADMIN_PASSWORD"
+    }
+  },
+  "providers": {
+    "llamacpp": {
+      "keys": [{"name": "none", "value": "", "models": ["*"], "weight": 1.0}],
+      "network_config": {
+        "base_url": "http://llamacpp-server:8080",
+        "allow_private_network": true,
+        "default_request_timeout_in_seconds": {{ router_chat_timeout }}
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "is_key_less": true,
+        "allowed_requests": {
+          "list_models": true,
+          "chat_completion": true,
+          "chat_completion_stream": true,
+          "text_completion": true,
+          "text_completion_stream": true,
+          "responses": true,
+          "responses_stream": true,
+          "embedding": true
+        }
+      }
+    },
+    "flm": {
+      "keys": [{"name": "none", "value": "", "models": ["*"], "weight": 1.0}],
+      "network_config": {
+        "base_url": "http://flm-asr:52625",
+        "allow_private_network": true,
+        "default_request_timeout_in_seconds": {{ router_stt_timeout }}
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "is_key_less": true,
+        "allowed_requests": {
+          "list_models": true,
+          "transcription": true
+        }
+      }
+    }
+  }
+}

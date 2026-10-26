@@ -1,0 +1,118 @@
+---
+# rootless containers cannot raise memlock above the account's limit. pam_limits applies it to
+# become sessions and to the user manager that runs the Quadlets
+- name: Allow Unlimited Locked Memory for the NPU
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/90-{{ service_account_user }}-memlock.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {{ service_account_user }} - memlock unlimited
+  notify: Restart User Manager
+
+- name: Apply Memlock Limit
+  ansible.builtin.meta: flush_handlers
+
+- name: Create STT Build Directory
+  ansible.builtin.file:
+    path: "{{ service_account_home }}/build/flm"
+    state: directory
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0755"
+
+- name: Copy STT Build Files
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ service_account_home }}/build/flm/{{ item }}"
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0644"
+  loop:
+    - Containerfile
+    - short.wav # test clip for the transcription checks
+
+- name: Build FastFlowLM Image
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_image:
+    name: "{{ stt_image }}"
+    path: "{{ service_account_home }}/build/flm"
+    build:
+      extra_args: --build-arg FLM_VERSION={{ stt_flm_version }}
+    state: present
+  notify: Restart STT
+
+- name: Verify NPU Is Visible in Container
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.command: >-
+    podman run --rm --device /dev/accel/accel0 --group-add keep-groups --ulimit memlock=-1:-1
+    {{ stt_image }} validate
+  register: stt_validate
+  changed_when: false
+  failed_when: >-
+    'NPU: /dev/accel/accel0' not in stt_validate.stdout
+    or 'Memlock Limit: infinity' not in stt_validate.stdout
+
+# flm ignores SIGTERM as PID 1; the init process forwards it so the container stops at once
+- name: Deploy Quadlet for flm-asr
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: flm-asr
+    image: "{{ stt_image }}"
+    init: true
+    network:
+      - llm.network
+    publish:
+      - 127.0.0.1:52625:52625/tcp
+    volume:
+      - flm-models:/root/.config/flm
+    device:
+      - /dev/accel/accel0
+    group_add:
+      - keep-groups
+    ulimit:
+      - memlock=-1:-1
+    command: serve --asr 1 --host 0.0.0.0
+    state: quadlet
+    quadlet_options:
+      - |
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+
+        [Install]
+        WantedBy=default.target
+  notify: Restart STT
+
+- name: Apply Pending Restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Start flm-asr
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd:
+    name: flm-asr.service
+    scope: user
+    daemon_reload: true
+    state: started
+
+# the first start downloads the Whisper model (620 MB). curl, not uri: uri base64-encodes file parts
+- name: Wait for STT
+  ansible.builtin.command:
+    argv:
+      - curl
+      - -sf
+      - http://127.0.0.1:52625/v1/audio/transcriptions
+      - -F
+      - file=@{{ service_account_home }}/build/flm/short.wav
+      - -F
+      - model=whisper-v3
+  register: stt_check
+  changed_when: false
+  until: "'fellow Americans' in stt_check.stdout"
+  retries: 30
+  delay: 10

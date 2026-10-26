@@ -1,10 +1,31 @@
 ---
+# amd_iommu=off leaves the NPU driver (amdxdna) unable to initialise
+- name: Verify IOMMU Is Enabled
+  ansible.builtin.assert:
+    that: ansible_facts['cmdline']['amd_iommu'] | default('') != 'off'
+    fail_msg: "amd_iommu=off is set on the kernel command line; remove it, the NPU needs the IOMMU"
+
 - name: Install Packages
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
     update_cache: true
     cache_valid_time: 3600
+
+- name: Gather Package Facts
+  ansible.builtin.package_facts:
+
+- name: Verify a Held Kernel Metapackage Is Installed
+  ansible.builtin.assert:
+    that: common_held_packages | reject('equalto', 'linux-firmware') | select('in', ansible_facts['packages']) | list | length > 0
+    fail_msg: "None of {{ common_held_packages }} is installed; add the host's kernel metapackage to common_held_packages"
+
+# upgrade these deliberately, then re-run the playbook so its GPU and NPU checks verify the pair
+- name: Hold Kernel and Firmware
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ common_held_packages | select('in', ansible_facts['packages']) | list }}"
 
 - name: Enable Tuned Service
   ansible.builtin.service:

@@ -1,0 +1,204 @@
+---
+# rootless podman binds the host port as the service account
+- name: Allow Unprivileged Bind to Router Port
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_unprivileged_port_start
+    value: "{{ router_port }}"
+    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
+  when: router_port < 1024
+
+- name: Create Bifrost Config Directory
+  ansible.builtin.file:
+    path: "{{ service_account_home }}/.config/bifrost"
+    state: directory
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0755"
+
+- name: Deploy Bifrost Configuration
+  ansible.builtin.template:
+    src: bifrost-config.json.j2
+    dest: "{{ service_account_home }}/.config/bifrost/config.json"
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0644"
+  notify: Restart Bifrost
+
+# config.db and logs.db live in the volume; config.json is applied over them at every start
+- name: Deploy Quadlet for Bifrost
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: bifrost
+    image: "{{ router_bifrost_image }}"
+    network:
+      - llm.network
+    publish:
+      - "{{ router_port }}:8080/tcp"
+    volume:
+      - bifrost-data:/app/data
+      - "{{ service_account_home }}/.config/bifrost/config.json:/app/data/config.json:ro"
+    env:
+      BIFROST_ADMIN_PASSWORD: "{{ router_admin_password }}"
+    state: quadlet
+    quadlet_options:
+      - |
+        [Unit]
+        Wants=llamacpp-server.service flm-asr.service
+        After=llamacpp-server.service flm-asr.service
+
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+
+        [Install]
+        WantedBy=default.target
+  no_log: true # the env holds the admin password
+  notify: Restart Bifrost
+
+- name: Deploy Quadlet for Wyoming Bridge
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: wyoming-openai
+    image: "{{ router_wyoming_image }}"
+    network:
+      - llm.network
+    publish:
+      - "{{ router_wyoming_port }}:10300/tcp"
+    env:
+      STT_OPENAI_URL: http://bifrost:8080/v1
+      STT_MODELS: flm/whisper-v3
+      STT_OPENAI_KEY: none # the client library requires a key; Bifrost ignores it
+    state: quadlet
+    quadlet_options:
+      - |
+        [Unit]
+        Wants=bifrost.service
+        After=bifrost.service
+
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+
+        [Install]
+        WantedBy=default.target
+  notify: Restart Wyoming Bridge
+
+# the OPENAI_* and ENABLE_OLLAMA_API values are stored in its database on first start; later changes are made in its admin settings
+- name: Deploy Quadlet for Open WebUI
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: open-webui
+    image: "{{ router_webui_image }}"
+    network:
+      - llm.network
+    publish:
+      - "{{ router_webui_port }}:8080/tcp"
+    volume:
+      - open-webui-data:/app/backend/data
+    env:
+      OPENAI_API_BASE_URL: http://bifrost:8080/v1
+      OPENAI_API_KEY: none
+      ENABLE_OLLAMA_API: "False"
+      WEBUI_AUTH: "False" # single shared user; cannot be turned on later without wiping open-webui-data
+    state: quadlet
+    quadlet_options:
+      - |
+        [Unit]
+        Wants=bifrost.service
+        After=bifrost.service
+
+        [Service]
+        Restart=on-failure
+        RestartSec=10
+
+        [Install]
+        WantedBy=default.target
+  notify: Restart Open WebUI
+
+- name: Allow Router Ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item | string }}"
+    proto: tcp
+  loop:
+    - "{{ router_port }}"
+    - "{{ router_wyoming_port }}"
+    - "{{ router_webui_port }}"
+
+- name: Apply Pending Restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Start Router Services
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    scope: user
+    daemon_reload: true
+    state: started
+  loop:
+    - bifrost.service
+    - wyoming-openai.service
+    - open-webui.service
+
+- name: Wait for Router
+  ansible.builtin.uri:
+    url: http://127.0.0.1:{{ router_port }}/v1/models
+    return_content: true
+  register: router_models
+  until: >-
+    router_models.status == 200
+    and router_models.json.data | selectattr('id', 'match', 'llamacpp/') | list | length > 0
+    and router_models.json.data | selectattr('id', 'match', 'flm/') | list | length > 0
+  retries: 30
+  delay: 10
+
+- name: Verify STT via Router
+  ansible.builtin.command:
+    argv:
+      - curl
+      - -sf
+      - http://127.0.0.1:{{ router_port }}/v1/audio/transcriptions
+      - -F
+      - file=@{{ service_account_home }}/build/flm/short.wav
+      - -F
+      - model=flm/whisper-v3
+  register: router_stt
+  changed_when: false
+  failed_when: "'fellow Americans' not in router_stt.stdout"
+
+# Wyoming is newline-delimited JSON; the describe reply names the advertised ASR models
+- name: Verify Wyoming Bridge
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        import socket
+        s = socket.create_connection(("127.0.0.1", {{ router_wyoming_port }}), timeout=10)
+        s.sendall(b'{"type": "describe"}\n')
+        reply = b""
+        while b"flm/whisper-v3" not in reply:
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            reply += chunk
+        print(reply.decode(errors="replace"))
+  register: router_wyoming
+  changed_when: false
+  failed_when: "'flm/whisper-v3' not in router_wyoming.stdout"
+  retries: 6
+  delay: 5
+  until: router_wyoming is not failed
+
+# the first start downloads its embedding model, so allow a few minutes
+- name: Wait for Open WebUI
+  ansible.builtin.uri:
+    url: http://127.0.0.1:{{ router_webui_port }}/health
+  register: router_webui
+  until: router_webui.status == 200
+  retries: 30
+  delay: 10

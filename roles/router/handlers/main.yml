@@ -1,0 +1,27 @@
+---
+- name: Restart Bifrost
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd:
+    name: bifrost.service
+    scope: user
+    daemon_reload: true
+    state: restarted
+
+- name: Restart Wyoming Bridge
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd:
+    name: wyoming-openai.service
+    scope: user
+    daemon_reload: true
+    state: restarted
+
+- name: Restart Open WebUI
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd:
+    name: open-webui.service
+    scope: user
+    daemon_reload: true
+    state: restarted

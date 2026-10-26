@@ -19,3 +19,9 @@
 
     - role: inference
       tags: [inference]
+
+    - role: stt
+      tags: [stt]
+
+    - role: router
+      tags: [router]
