@@ -2,12 +2,11 @@
 
 A local LLM inference server for AMD Strix Halo (Ryzen AI Max, `gfx1151`), deployed via Ansible on **Ubuntu 26.04 x86_64**. Other distributions, releases, and architectures are not supported.
 
-The playbook runs five rootless Podman Quadlet user services:
+The playbook runs four rootless Podman Quadlet user services:
 
 - `llamacpp-server`: llama.cpp `llama-server` built on the target with ROCm 10.0 for `gfx1151`, on the GPU
 - `flm-asr`: [FastFlowLM](https://github.com/ROCm/FastFlowLM) Whisper-V3-Turbo speech-to-text on the XDNA 2 NPU
 - `bifrost`: [Bifrost](https://github.com/maximhq/bifrost) gateway, the single OpenAI-compatible endpoint for both
-- `wyoming-openai`: [Wyoming](https://github.com/roryeckel/wyoming_openai) bridge so Home Assistant can use the speech-to-text
 - `open-webui`: [Open WebUI](https://github.com/open-webui/open-webui) chat front end that talks to Bifrost
 
 ROCm and XRT are only in the images. The host needs the kernel drivers and firmware, the TTM memory limit, Podman, and unlimited locked memory for the service account (the `service_account` role sets it).
@@ -44,12 +43,11 @@ cat /sys/module/ttm/parameters/pages_limit   # equals common_ttm_pages_limit
 |---------|------|-------------|
 | SSH | 22 | Remote access |
 | Bifrost | 80 | OpenAI-compatible API (`/v1`) + Bifrost dashboard (`/`) |
-| Wyoming bridge | 10300 | Speech-to-text for Home Assistant |
 | Open WebUI | 3000 | Chat in the browser, through Bifrost |
 | llama-server | 127.0.0.1:8080 | Backend; API and built-in Web UI on the host only |
 | flm-asr | 127.0.0.1:52625 | Backend; speech-to-text on the host only |
 
-The API is at `http://<target>/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/gpt-oss-20b-GGUF:F16`) and `flm/whisper-v3` for `/v1/audio/transcriptions`. To list them, run `curl http://<target>/v1/models`. The `flm/` list includes every FastFlowLM model, but only `flm/whisper-v3` is loaded.
+The API is at `http://<target>/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`) and `flm/whisper-v3` for `/v1/audio/transcriptions`. To list them, run `curl http://<target>/v1/models`. The `flm/` list includes every FastFlowLM model, but only `flm/whisper-v3` is loaded.
 
 ```bash
 curl http://<target>/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 -F language=en
@@ -69,12 +67,27 @@ Open the chat at `http://<target>:3000`. It has no login: everyone on the networ
 
 ### Home Assistant
 
-Add the **Wyoming Protocol** integration with host `<target>` and port `10300`, then select `flm/whisper-v3` as the speech-to-text engine of an Assist pipeline. A short command takes about 2 s to transcribe: Whisper always processes a 30 s window. Requests are handled one at a time.
+Home Assistant uses its built-in **OpenAI** integration for speech-to-text. The integration has no base URL setting, but the OpenAI client library it uses reads `OPENAI_BASE_URL` from the environment, so point the Home Assistant process at Bifrost. This is not supported by Home Assistant, so check it after Home Assistant upgrades.
 
-To test the bridge from a workstation:
+1. Set the environment variable on the Home Assistant container and restart it. On Kubernetes, in the pod spec:
+
+   ```yaml
+   env:
+     - name: OPENAI_BASE_URL
+       value: "http://<target>/v1"
+   ```
+
+2. Under Settings → Devices & services, add the **OpenAI** integration. Enter any API key: Bifrost ignores it, but the field is required.
+3. Open the integration's **OpenAI STT** entry and type `flm/whisper-v3` as the model. The dropdown lists OpenAI's models but accepts a custom value.
+4. Select that speech-to-text entity in an Assist pipeline.
+
+The variable applies to the whole Home Assistant process: every OpenAI-based integration without its own base URL calls Bifrost. The conversation agent the integration creates defaults to an OpenAI model that Bifrost does not have; ignore it or set it to a `llamacpp/` model.
+
+A short command takes about 2 s to transcribe: Whisper always processes a 30 s window. Requests are handled one at a time. To send the same request Home Assistant sends:
 
 ```bash
-uv run --no-project --with wyoming python -I tests/wyoming_roundtrip.py <target> 10300 clip.wav
+curl http://<target>/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 \
+  -F language=en -F response_format=json -F prompt="Home Assistant voice command"
 ```
 
 ## Managing the Service
@@ -103,8 +116,7 @@ podman images localhost/llama-server
 ```mermaid
 flowchart LR
     CLIENT["API client"] --> BIFROST["bifrost\nport 80 → 8080"]
-    HA["Home Assistant"] --> WYOMING["wyoming-openai\nport 10300"]
-    WYOMING --> BIFROST
+    HA["Home Assistant"] --> BIFROST
     BROWSER["Browser"] --> WEBUI["open-webui\nport 3000 → 8080"]
     WEBUI --> BIFROST
     BIFROST --> LLAMA["llamacpp-server\n:8080"]
@@ -164,11 +176,11 @@ sudo reboot
 
 | Role | Tags | Purpose |
 |------|------|---------|
-| `common` | `common` | IOMMU check, packages, kernel and firmware hold, tuned profile, journald limits, TTM pages limit and initramfs rebuild (no ROCm on the host), unattended security upgrades, base firewall |
+| `common` | `common` | IOMMU check, packages, kernel and firmware hold, tuned profile, journald limits, TTM pages limit and initramfs rebuild (no ROCm on the host), kdump removal (frees the crashkernel reservation), unattended security upgrades, base firewall |
 | `service_account` | (dependency) | Service account (`render`/`video`, lingering, memlock limit), `llm.network`. Runs with each of the roles below |
 | `inference` | `inference` | llama-server image build, GPU check, preset file, Quadlet, health check |
 | `stt` | `stt` | FastFlowLM image build, NPU check, Quadlet, transcription check |
-| `router` | `router` | Bifrost config and Quadlet, Wyoming bridge and Open WebUI Quadlets, unprivileged port, firewall, end-to-end checks. Needs `inference` and `stt` deployed first |
+| `router` | `router` | Bifrost config and Quadlet, Open WebUI Quadlet, unprivileged port, firewall, end-to-end checks. Needs `inference` and `stt` deployed first |
 
 ## Configuration
 
@@ -192,26 +204,24 @@ Keys are llama.cpp CLI arguments without leading dashes (see the [model presets 
 
 ### Prompt Cache
 
-`cache-ram: 8192` in the `"*"` preset gives llama.cpp 8 GiB of host RAM to keep processed prompt prefixes. A request that starts with the same text as an earlier one (system prompt, earlier turns of a chat) skips processing that part again.
+`cache-ram: 4096` in the `"*"` preset gives llama.cpp 4 GiB of host RAM to keep processed prompt prefixes. A request that starts with the same text as an earlier one (system prompt, earlier turns of a chat) skips processing that part again.
 
 ### Key Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `inference_llama_ref` | `v0.5.0` | llama.cpp git tag built into the image |
+| `inference_llama_ref` | `v0.7.0` | llama.cpp git tag built into the image |
 | `inference_models_max` | `1` | Models loaded at once |
 | `stt_flm_version` | `1.0.10` | FastFlowLM release built into the image |
 | `router_port` | `80` | Host port for Bifrost |
-| `router_wyoming_port` | `10300` | Host port for the Wyoming bridge |
 | `router_bifrost_image` | `docker.io/maximhq/bifrost:v2.3.2` | Bifrost image |
-| `router_wyoming_image` | `ghcr.io/roryeckel/wyoming_openai:0.8.0` | Wyoming bridge image |
 | `router_webui_port` | `3000` | Host port for Open WebUI |
 | `router_webui_image` | `ghcr.io/open-webui/open-webui:v0.12.3` | Open WebUI image |
 | `router_stt_timeout` | `300` | Seconds Bifrost waits for a transcription |
 | `router_chat_timeout` | `900` | Seconds Bifrost waits for a non-streaming chat or completion |
 | `service_account_user` | `llm` | Account that owns and runs the services |
 | `common_kernel_packages` | kernel metapackages | Held against upgrades with `linux-firmware`, if installed |
-| `common_ttm_pages_limit` | `26214400` | TTM pages limit (GPU-addressable system memory) |
+| `common_ttm_pages_limit` | `29360128` | TTM pages limit (GPU-addressable system memory) |
 | `common_tuned_profile` | `throughput-performance` | `tuned` profile |
 | `common_unattended_reboot` | `false` | Allow unattended reboots at 03:00 |
 
@@ -226,7 +236,7 @@ After `./setup.sh --dev`:
 This runs an Ansible syntax check and `ansible-lint` with the production profile. To test the image build without deploying:
 
 ```bash
-podman build --build-arg LLAMA_REF=v0.5.0 -t localhost/llama-server:v0.5.0-rocm10.0 roles/inference/files
+podman build --build-arg LLAMA_REF=v0.7.0 -t localhost/llama-server:v0.7.0-rocm10.0 roles/inference/files
 ```
 
 The playbook does not reuse an image built this way: it rebuilds it, because the image lacks the Containerfile hash label that the playbook checks.

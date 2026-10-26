@@ -76,6 +76,14 @@
       options ttm pages_limit={{ common_ttm_pages_limit }}
   notify: TTM Changed
 
+# Its crashkernel= reservation holds back memory the GPU could use
+- name: Remove Crash Dump Support
+  ansible.builtin.apt:
+    name: kdump-tools
+    state: absent
+    purge: true
+  notify: Kernel Cmdline Changed
+
 # The apt timers read these files on each run, so no restart is needed
 - name: Configure APT Periodic Updates
   ansible.builtin.copy:

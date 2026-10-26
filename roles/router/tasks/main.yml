@@ -50,29 +50,6 @@
   no_log: true # The env holds the admin password
   notify: Restart Bifrost
 
-- name: Deploy Quadlet for Wyoming Bridge
-  become: true
-  become_user: "{{ service_account_user }}"
-  containers.podman.podman_container:
-    name: wyoming-openai
-    image: "{{ router_wyoming_image }}"
-    network:
-      - llm.network
-    publish:
-      - "{{ router_wyoming_port }}:10300/tcp"
-    env:
-      STT_OPENAI_URL: http://bifrost:8080/v1
-      STT_MODELS: flm/whisper-v3
-      STT_OPENAI_KEY: none # The client library requires a key that Bifrost ignores
-    state: quadlet
-    quadlet_options:
-      - |
-        [Unit]
-        Wants=bifrost.service
-        After=bifrost.service
-      - "{{ service_account_quadlet_options }}"
-  notify: Restart Wyoming Bridge
-
 # Open WebUI stores OPENAI_* and ENABLE_OLLAMA_API in its database on first start, so later changes go through its admin settings
 - name: Deploy Quadlet for Open WebUI
   become: true
@@ -107,7 +84,6 @@
     proto: tcp
   loop:
     - "{{ router_port }}"
-    - "{{ router_wyoming_port }}"
     - "{{ router_webui_port }}"
 
 - name: Apply Pending Restarts
@@ -123,7 +99,6 @@
     state: started
   loop:
     - bifrost.service
-    - wyoming-openai.service
     - open-webui.service
 
 - name: Wait for Router
@@ -147,33 +122,16 @@
       - file=@{{ service_account_home }}/build/flm/short.wav
       - -F
       - model=flm/whisper-v3
+      # The fields Home Assistant's OpenAI integration adds
+      - -F
+      - language=en
+      - -F
+      - response_format=json
+      - -F
+      - prompt=Home Assistant voice command
   register: router_stt
   changed_when: false
   failed_when: "'fellow Americans' not in router_stt.stdout"
-
-# Wyoming is newline-delimited JSON, and the describe reply names the advertised ASR models
-- name: Verify Wyoming Bridge
-  ansible.builtin.command:
-    argv:
-      - python3
-      - -c
-      - |
-        import socket
-        s = socket.create_connection(("127.0.0.1", {{ router_wyoming_port }}), timeout=10)
-        s.sendall(b'{"type": "describe"}\n')
-        reply = b""
-        while b"flm/whisper-v3" not in reply:
-            chunk = s.recv(65536)
-            if not chunk:
-                break
-            reply += chunk
-        print(reply.decode(errors="replace"))
-  register: router_wyoming
-  changed_when: false
-  failed_when: "'flm/whisper-v3' not in router_wyoming.stdout"
-  retries: 6
-  delay: 5
-  until: router_wyoming is not failed
 
 # The first start downloads its embedding model, so allow a few minutes
 - name: Wait for Open WebUI

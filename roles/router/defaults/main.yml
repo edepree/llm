@@ -1,9 +1,7 @@
 ---
 router_port: 80
-router_wyoming_port: 10300
 router_webui_port: 3000
 router_bifrost_image: docker.io/maximhq/bifrost:v2.3.2
-router_wyoming_image: ghcr.io/roryeckel/wyoming_openai:0.8.0
 router_webui_image: ghcr.io/open-webui/open-webui:v0.12.3
 # Seconds, including time queued behind another request since FLM handles one at a time
 # Bifrost's 100 MB body limit caps a 44.1 kHz stereo WAV at ~9 min, which FLM transcribes at ~0.13x real time

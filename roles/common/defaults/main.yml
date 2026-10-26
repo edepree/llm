@@ -21,6 +21,6 @@ common_tuned_profile: throughput-performance
 common_journald_maxuse: 1G
 
 # GPU-addressable system memory in 4 KiB pages
-common_ttm_pages_limit: 26214400
+common_ttm_pages_limit: 29360128 # 112 GiB
 
 common_unattended_reboot: false

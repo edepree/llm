@@ -1,5 +1,5 @@
 ---
-inference_llama_ref: v0.5.0
+inference_llama_ref: v0.7.0
 inference_models_max: 1
 # ROCm 10.0 and gfx1151 are set in files/Containerfile, so update this tag with them
 inference_image: "localhost/llama-server:{{ inference_llama_ref }}-rocm10.0"
@@ -7,18 +7,11 @@ inference_image: "localhost/llama-server:{{ inference_llama_ref }}-rocm10.0"
 # "*" applies to every model
 inference_presets:
   "*":
-    cache-ram: 8192 # MiB of host RAM for the prompt (KV prefix) cache
+    cache-ram: 4096 # MiB of host RAM for the prompt (KV prefix) cache
     flash-attn: "on"
     n-gpu-layers: 999
     load-mode: none # Read the model into memory instead of using mmap
     threads: 32
-  "unsloth/gpt-oss-20b-GGUF:F16":
-    c: 131072
-    hf-repo: unsloth/gpt-oss-20b-GGUF:F16
-    min-p: 0.00
-    temp: 1.0
-    top-k: 0
-    top-p: 1.0
   "unsloth/gpt-oss-120b-GGUF:F16":
     c: 131072
     hf-repo: unsloth/gpt-oss-120b-GGUF:F16
@@ -51,6 +44,9 @@ inference_presets:
     min-p: 0.00
     presence-penalty: 0.0
     spec-default: true
+    spec-draft-n-max: 2
+    spec-draft-n-ubatch: 128 # Spares GPU memory, which this model nearly fills
+    spec-type: draft-mtp
     temp: 1.0
     top-k: 20
     top-p: 0.95
