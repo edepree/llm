@@ -44,8 +44,8 @@
     quadlet_options:
       - |
         [Unit]
-        Wants=llamacpp-server.service flm-asr.service
-        After=llamacpp-server.service flm-asr.service
+        Wants=llamacpp-server.service flm-asr.service kokoro-tts.service
+        After=llamacpp-server.service flm-asr.service kokoro-tts.service
       - "{{ service_account_quadlet_options }}"
   no_log: true # The env holds the admin password
   notify: Restart Bifrost
@@ -132,6 +132,25 @@
   register: router_stt
   changed_when: false
   failed_when: "'fellow Americans' not in router_stt.stdout"
+
+# Bifrost labels every speech response audio/mpeg whatever the format, so check the size of the audio instead
+- name: Verify TTS via Router
+  ansible.builtin.command:
+    argv:
+      - curl
+      - -sf
+      - -o
+      - /dev/null
+      - -w
+      - "%{size_download}"
+      - http://127.0.0.1:{{ router_port }}/v1/audio/speech
+      - -H
+      - "Content-Type: application/json"
+      - -d
+      - '{"model": "kokoro/kokoro", "input": "The lights are off.", "voice": "alloy", "response_format": "mp3"}'
+  register: router_tts
+  changed_when: false
+  failed_when: router_tts.rc != 0 or router_tts.stdout | int < 10000
 
 # The first start downloads its embedding model, so allow a few minutes
 - name: Wait for Open WebUI

@@ -2,11 +2,12 @@
 
 A local LLM inference server for AMD Strix Halo (Ryzen AI Max, `gfx1151`), deployed via Ansible on **Ubuntu 26.04 x86_64**. Other distributions, releases, and architectures are not supported.
 
-The playbook runs four rootless Podman Quadlet user services:
+The playbook runs five rootless Podman Quadlet user services:
 
 - `llamacpp-server`: llama.cpp `llama-server` built on the target with ROCm 10.0 for `gfx1151`, on the GPU
 - `flm-asr`: [FastFlowLM](https://github.com/ROCm/FastFlowLM) Whisper-V3-Turbo speech-to-text on the XDNA 2 NPU
-- `bifrost`: [Bifrost](https://github.com/maximhq/bifrost) gateway, the single OpenAI-compatible endpoint for both
+- `kokoro-tts`: [Kokoros](https://github.com/lucasjinreal/Kokoros) Kokoro-82M text-to-speech on the CPU, built on the target
+- `bifrost`: [Bifrost](https://github.com/maximhq/bifrost) gateway, the single OpenAI-compatible endpoint for the three backends
 - `open-webui`: [Open WebUI](https://github.com/open-webui/open-webui) chat front end that talks to Bifrost
 
 ROCm and XRT are only in the images. The host needs the kernel drivers and firmware, the TTM memory limit, Podman, and unlimited locked memory for the service account (the `service_account` role sets it).
@@ -27,7 +28,7 @@ The setup script prompts for:
 
 Remote targets log in with the SSH password (press Enter at the prompt to use an SSH key instead). Password login needs `sshpass` on the machine running Ansible (`sudo apt install sshpass`). A new host key is accepted on first connect; a changed key is rejected.
 
-The first run builds two images before the services start: llama-server (20–40 minutes) and FastFlowLM (a few minutes).
+The first run builds three images before the services start: llama-server (20–40 minutes), FastFlowLM (a few minutes) and Kokoros (about 10 minutes).
 
 ### First Boot
 
@@ -46,12 +47,17 @@ cat /sys/module/ttm/parameters/pages_limit   # equals common_ttm_pages_limit
 | Open WebUI | 80 | Chat in the browser, through Bifrost |
 | llama-server | 127.0.0.1:8081 | Backend; API and built-in Web UI on the host only |
 | flm-asr | 127.0.0.1:52625 | Backend; speech-to-text on the host only |
+| kokoro-tts | 127.0.0.1:3000 | Backend; text-to-speech on the host only |
 
-The API is at `http://<target>:8080/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`) and `flm/whisper-v3` for `/v1/audio/transcriptions`. To list them, run `curl http://<target>:8080/v1/models`. FastFlowLM's models are left out of the list, since FastFlowLM lists only its chat models and not `flm/whisper-v3`, which still works when called by name.
+The API is at `http://<target>:8080/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`), `flm/whisper-v3` for `/v1/audio/transcriptions`, and `kokoro/kokoro` for `/v1/audio/speech`. To list them, run `curl http://<target>:8080/v1/models`. FastFlowLM's and Kokoros' models are left out of the list, since FastFlowLM lists only its chat models and Kokoros a fixed list of OpenAI names. Both still work when called by name.
 
 ```bash
 curl http://<target>:8080/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 -F language=en
+curl http://<target>:8080/v1/audio/speech -H 'Content-Type: application/json' -o reply.wav \
+  -d '{"model": "kokoro/kokoro", "input": "The lights are off.", "voice": "af_heart", "response_format": "wav"}'
 ```
+
+Kokoros ignores `model`. `voice` takes a [Kokoro voice](https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md) or an OpenAI voice name (`alloy`, `nova`, `onyx`, …), which it maps to a Kokoro voice. It synthesizes one request at a time.
 
 Set `language` when you know it: without it Whisper detects the language and can add made-up text at trailing silence.
 
@@ -67,7 +73,7 @@ Open the chat at `http://<target>`. It has no login: everyone on the network sha
 
 ### Home Assistant
 
-Home Assistant uses its built-in **OpenAI** integration for speech-to-text. The integration has no base URL setting, but the OpenAI client library it uses reads `OPENAI_BASE_URL` from the environment, so point the Home Assistant process at Bifrost. This is not supported by Home Assistant, so check it after Home Assistant upgrades.
+Home Assistant uses its built-in **OpenAI** integration for speech-to-text and text-to-speech. The integration has no base URL setting, but the OpenAI client library it uses reads `OPENAI_BASE_URL` from the environment, so point the Home Assistant process at Bifrost. This is not supported by Home Assistant, so check it after Home Assistant upgrades.
 
 1. Set the environment variable on the Home Assistant container and restart it. On Kubernetes, in the pod spec:
 
@@ -79,7 +85,8 @@ Home Assistant uses its built-in **OpenAI** integration for speech-to-text. The 
 
 2. Under Settings → Devices & services, add the **OpenAI** integration. Enter any API key: Bifrost ignores it, but the field is required.
 3. Open the integration's **OpenAI STT** entry and type `flm/whisper-v3` as the model. The dropdown lists OpenAI's models but accepts a custom value.
-4. Select that speech-to-text entity in an Assist pipeline.
+4. Add the integration's **OpenAI TTS** entry. It has no model setting and always requests `gpt-4o-mini-tts`; Bifrost sends that to Kokoros, its only provider that handles speech. Pick the voice in the Assist pipeline: each OpenAI voice maps to a Kokoro voice (for example Nova to `af_nova`, Onyx to `am_onyx`).
+5. Select those speech-to-text and text-to-speech entities in an Assist pipeline.
 
 The variable applies to the whole Home Assistant process: every OpenAI-based integration without its own base URL calls Bifrost. The conversation agent the integration creates defaults to an OpenAI model that Bifrost does not have; ignore it or set it to a `llamacpp/` model.
 
@@ -121,8 +128,10 @@ flowchart LR
     WEBUI --> BIFROST
     BIFROST --> LLAMA["llamacpp-server\n:8080"]
     BIFROST --> FLM["flm-asr\n:52625"]
+    BIFROST --> TTS["kokoro-tts\n:3000"]
     LLAMA --> GPU["AMD GPU\n/dev/kfd, /dev/dri"]
     FLM --> NPU["AMD NPU\n/dev/accel/accel0"]
+    TTS --> CPU["CPU"]
 ```
 
 All containers join the Quadlet network `llm.network` and reach each other by container name. Named volumes hold the downloads and state: `llamacpp-models`, `flm-models`, `bifrost-data` (Bifrost's `config.db` and `logs.db`), and `open-webui-data` (users and chats). Bifrost reads `~llm/.config/bifrost/config.json` at every start, and the file wins over changes made in the dashboard (`source_of_truth: config.json`).
@@ -158,6 +167,10 @@ The NPU needs the IOMMU (the `common` role fails if `amd_iommu=off` is set), the
 
 FastFlowLM's NPU kernels are closed source, free to use and redistribute under the FastFlowLM NPU Binary License. Powered by [FastFlowLM](https://github.com/ROCm/FastFlowLM).
 
+## Upgrading Kokoros
+
+Kokoros has no release tags. Set `tts_kokoros_ref` in `roles/tts/defaults/main.yml` to a [Kokoros commit](https://github.com/lucasjinreal/Kokoros/commits/main), then run the playbook with `--tags tts`. The play builds a new image and synthesizes a test phrase. The image holds the Kokoro v1.0 model and voices from the [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) release, so the container downloads nothing at start. Each build leaves an untagged builder image with the Rust toolchain; remove it with `podman image prune -f`.
+
 ## Kernel and Firmware Upgrades
 
 The containers bring their own ROCm and XRT user space, which must match the host's `amdgpu`/`amdxdna` drivers and firmware. The `common` role therefore holds `linux-firmware` and the installed kernel metapackage from `common_kernel_packages` (`linux-generic`, `linux-generic-hwe-26.04` or `linux-oem-26.04`), and unattended upgrades leave them alone. The role fails if none of these kernel metapackages is installed. To upgrade them:
@@ -180,7 +193,8 @@ sudo reboot
 | `service_account` | (dependency) | Service account (`render`/`video`, lingering, memlock limit), `llm.network`. Runs with each of the roles below |
 | `inference` | `inference` | llama-server image build, GPU check, preset file, Quadlet, health check |
 | `stt` | `stt` | FastFlowLM image build, NPU check, Quadlet, transcription check |
-| `router` | `router` | Bifrost config and Quadlet, Open WebUI Quadlet, unprivileged port, firewall, end-to-end checks. Needs `inference` and `stt` deployed first |
+| `tts` | `tts` | Kokoros image build, Quadlet, speech check |
+| `router` | `router` | Bifrost config and Quadlet, Open WebUI Quadlet, unprivileged port, firewall, end-to-end checks. Needs `inference`, `stt` and `tts` deployed first |
 
 ## Configuration
 
@@ -213,11 +227,13 @@ Keys are llama.cpp CLI arguments without leading dashes (see the [model presets 
 | `inference_llama_ref` | `v0.7.0` | llama.cpp git tag built into the image |
 | `inference_models_max` | `1` | Models loaded at once |
 | `stt_flm_version` | `1.0.10` | FastFlowLM release built into the image |
+| `tts_kokoros_ref` | `dda39518…` | Kokoros commit built into the image |
 | `router_port` | `8080` | Host port for Bifrost |
 | `router_bifrost_image` | `docker.io/maximhq/bifrost:v2.3.2` | Bifrost image |
 | `router_webui_port` | `80` | Host port for Open WebUI |
 | `router_webui_image` | `ghcr.io/open-webui/open-webui:v0.12.3` | Open WebUI image |
 | `router_stt_timeout` | `300` | Seconds Bifrost waits for a transcription |
+| `router_tts_timeout` | `60` | Seconds Bifrost waits for speech |
 | `router_chat_timeout` | `900` | Seconds Bifrost waits for a non-streaming chat or completion |
 | `service_account_user` | `llm` | Account that owns and runs the services |
 | `common_kernel_packages` | kernel metapackages | Held against upgrades with `linux-firmware`, if installed |

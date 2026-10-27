@@ -1,0 +1,4 @@
+---
+# kokoros has no release tags, so pin a commit
+tts_kokoros_ref: dda39518d210ba48a63782e524eaee435eab17a7
+tts_image: "localhost/kokoros:{{ tts_kokoros_ref[:12] }}"

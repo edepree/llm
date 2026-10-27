@@ -49,6 +49,23 @@
           "transcription": true
         }
       }
+    },
+    "kokoro": {
+      "keys": [{"name": "none", "value": "", "models": ["*"], "weight": 1.0}],
+      "network_config": {
+        "base_url": "http://kokoro-tts:3000",
+        "allow_private_network": true,
+        "default_request_timeout_in_seconds": {{ router_tts_timeout }}
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "is_key_less": true,
+        "allowed_requests": {
+          "list_models": false,
+          "speech": true,
+          "speech_stream": true
+        }
+      }
     }
   }
 }

@@ -1,0 +1,82 @@
+---
+- name: Create TTS Build Directory
+  ansible.builtin.file:
+    path: "{{ service_account_home }}/build/kokoros"
+    state: directory
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0755"
+
+- name: Copy Containerfile
+  ansible.builtin.copy:
+    src: Containerfile
+    dest: "{{ service_account_home }}/build/kokoros/Containerfile"
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0644"
+
+# builds only when the tag is missing or the Containerfile changed
+- name: Build Kokoros Image
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_image:
+    name: "{{ tts_image }}"
+    path: "{{ service_account_home }}/build/kokoros"
+    build:
+      extra_args: --build-arg KOKOROS_REF={{ tts_kokoros_ref }}
+    state: present
+  async: 3600 # the build continues if the SSH connection drops
+  poll: 30
+  notify: Restart TTS
+
+# one instance gives the shortest time to first audio, which matters more than throughput for voice replies.
+# koko ignores SIGTERM as PID 1, so the init process forwards it
+- name: Deploy Quadlet for kokoro-tts
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: kokoro-tts
+    image: "{{ tts_image }}"
+    init: true
+    network:
+      - llm.network
+    publish:
+      - 127.0.0.1:3000:3000/tcp
+    command: --instances 1 openai
+    state: quadlet
+    quadlet_options:
+      - "{{ service_account_quadlet_options }}"
+  notify: Restart TTS
+
+- name: Apply Pending Restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Start kokoro-tts
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd_service:
+    name: kokoro-tts.service
+    scope: user
+    daemon_reload: true
+    state: started
+
+# kokoros has no health endpoint, so synthesize a phrase
+- name: Wait for TTS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - -sf
+      - -o
+      - /dev/null
+      - -w
+      - "%{content_type}"
+      - http://127.0.0.1:3000/v1/audio/speech
+      - -H
+      - "Content-Type: application/json"
+      - -d
+      - '{"model": "kokoro", "input": "The lights are off.", "voice": "alloy", "response_format": "wav"}'
+  register: tts_check
+  changed_when: false
+  until: "'audio/wav' in tts_check.stdout"
+  retries: 30
+  delay: 10

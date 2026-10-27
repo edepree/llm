@@ -23,5 +23,8 @@
     - role: stt
       tags: [stt]
 
+    - role: tts
+      tags: [tts]
+
     - role: router
       tags: [router]

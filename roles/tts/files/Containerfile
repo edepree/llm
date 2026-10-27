@@ -1,0 +1,33 @@
+FROM docker.io/library/ubuntu:26.04 AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates cargo clang cmake curl git libclang-dev libopus-dev \
+    libpcaudio-dev libsonic-dev libssl-dev pkg-config rustc \
+  && rm -rf /var/lib/apt/lists/*
+
+ARG KOKOROS_REF
+WORKDIR /src
+RUN test -n "${KOKOROS_REF}" || { echo "ERROR: KOKOROS_REF build arg is required"; exit 1; } \
+  && git init -q . \
+  && git fetch -q --depth 1 https://github.com/lucasjinreal/Kokoros.git "${KOKOROS_REF}" \
+  && git checkout -q FETCH_HEAD
+
+RUN cargo build --release --locked
+
+# koko reads the models and ./espeak-ng-data relative to its working directory
+RUN mkdir -p /opt/kokoros/checkpoints /opt/kokoros/data \
+  && cp target/release/koko /opt/kokoros/ \
+  && cp -r "$(find target/release/build -type d -path '*/share/espeak-ng-data' | head -1)" /opt/kokoros/ \
+  && curl -fsSLo /opt/kokoros/checkpoints/kokoro-v1.0.onnx \
+    https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx \
+  && curl -fsSLo /opt/kokoros/data/voices-v1.0.bin \
+    https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+
+FROM docker.io/library/ubuntu:26.04
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libopus0 libpcaudio0 libsonic0 libssl3t64 \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /opt/kokoros /opt/kokoros
+WORKDIR /opt/kokoros
+ENTRYPOINT ["/opt/kokoros/koko"]

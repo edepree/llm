@@ -6,6 +6,8 @@ router_webui_image: ghcr.io/open-webui/open-webui:v0.12.3
 # Seconds, including time queued behind another request since FLM handles one at a time
 # Bifrost's 100 MB body limit caps a 44.1 kHz stereo WAV at ~9 min, which FLM transcribes at ~0.13x real time
 router_stt_timeout: 300
+# Seconds for a speech reply, which Kokoros synthesizes one at a time
+router_tts_timeout: 60
 # Seconds for a non-streaming chat, covering a cold load of a large model plus a long answer
 router_chat_timeout: 900
 # Dashboard login only, the API needs no key
