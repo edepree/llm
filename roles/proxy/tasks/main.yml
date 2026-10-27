@@ -51,14 +51,6 @@
     port: "80"
     proto: tcp
 
-# Bifrost was published on 8080 before Caddy
-- name: Remove Old Bifrost Port Rule
-  community.general.ufw:
-    rule: allow
-    port: "8080"
-    proto: tcp
-    delete: true
-
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
 

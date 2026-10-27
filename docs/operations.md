@@ -29,7 +29,7 @@ podman run --rm --network llm docker.io/curlimages/curl -s http://llamacpp-serve
 
 `sudo -u llm` and `su - llm` do not open a login session, so `systemctl --user` and `podman` cannot find the user manager or the container state.
 
-`common_packages` (`roles/common/defaults/main.yml`) includes monitoring tools: `nvtop` (GPU), `nethogs` (network per process; rootless container traffic shows up under `pasta`), and `xrt-smi examine` (NPU).
+Monitoring tools from `common_packages` (`roles/common/defaults/main.yml`): `nvtop` (GPU), `sudo nethogs` (network per process; rootless container traffic shows up under `pasta`), and `xrt-smi examine` (NPU).
 
 ## Changing Models
 

@@ -27,6 +27,8 @@
     build:
       extra_args: --build-arg FLM_VERSION={{ stt_flm_version }}
     state: present
+  async: 3600 # the build continues if the SSH connection drops
+  poll: 30
   notify: Restart STT
 
 - name: Verify NPU Is Visible in Container

@@ -48,8 +48,7 @@ The first run builds three images: llama-server (20–40 minutes), Kokoros (abou
 ## Development
 
 ```bash
-./setup.sh --dev
-./validate.sh   # syntax check and ansible-lint
+./validate.sh   # syntax check and ansible-lint, after ./setup.sh --dev
 ```
 
 FastFlowLM's NPU kernels are closed source, free to use and redistribute under the FastFlowLM NPU Binary License. Powered by [FastFlowLM](https://github.com/ROCm/FastFlowLM).
