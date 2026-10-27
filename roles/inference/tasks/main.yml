@@ -58,8 +58,6 @@
   containers.podman.podman_container:
     name: llamacpp-server
     image: "{{ inference_image }}"
-    publish:
-      - 127.0.0.1:8081:8080/tcp # model router is the LAN entry point
     network:
       - llm.network
     volume:
@@ -100,9 +98,20 @@
     state: started
 
 - name: Wait for llama-server Health
-  ansible.builtin.uri:
-    url: http://127.0.0.1:8081/health
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - "{{ service_account_curl_image }}"
+      - -sf
+      - http://llamacpp-server:8080/health
   register: inference_health
-  until: inference_health.status == 200
+  changed_when: false
+  until: inference_health.rc == 0
   retries: 30
   delay: 10

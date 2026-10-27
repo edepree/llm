@@ -1,0 +1,5 @@
+---
+proxy_caddy_image: docker.io/library/caddy:2.10.2
+proxy_webui_host: chat.home.arpa
+# Bifrost also answers any other host and the bare IP (Home Assistant)
+proxy_router_host: router.home.arpa

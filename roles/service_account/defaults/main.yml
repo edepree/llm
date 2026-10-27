@@ -1,5 +1,7 @@
 ---
 service_account_user: llm
+# Deploy checks run from this image on the llm network, since only the proxy publishes a host port
+service_account_curl_image: docker.io/curlimages/curl:8.16.0
 service_account_quadlet_options: |
   [Service]
   Restart=on-failure

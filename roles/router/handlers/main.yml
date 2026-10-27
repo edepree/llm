@@ -7,12 +7,3 @@
     scope: user
     daemon_reload: true
     state: restarted
-
-- name: Restart Open WebUI
-  become: true
-  become_user: "{{ service_account_user }}"
-  ansible.builtin.systemd_service:
-    name: open-webui.service
-    scope: user
-    daemon_reload: true
-    state: restarted

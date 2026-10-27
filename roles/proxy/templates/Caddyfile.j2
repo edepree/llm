@@ -1,0 +1,11 @@
+{
+	auto_https off
+}
+
+http://{{ proxy_webui_host }} {
+	reverse_proxy open-webui:8080
+}
+
+http://{{ proxy_router_host }}, :80 {
+	reverse_proxy bifrost:8080
+}

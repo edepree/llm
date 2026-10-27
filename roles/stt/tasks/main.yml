@@ -51,8 +51,6 @@
     init: true
     network:
       - llm.network
-    publish:
-      - 127.0.0.1:52625:52625/tcp
     volume:
       - flm-models:/root/.config/flm
     device:
@@ -83,13 +81,22 @@
 
 # the first start downloads the Whisper model (620 MB). curl because uri base64-encodes file parts
 - name: Wait for STT
+  become: true
+  become_user: "{{ service_account_user }}"
   ansible.builtin.command:
     argv:
-      - curl
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - -v
+      - "{{ service_account_home }}/build/flm/short.wav:/short.wav:ro"
+      - "{{ service_account_curl_image }}"
       - -sf
-      - http://127.0.0.1:52625/v1/audio/transcriptions
+      - http://flm-asr:52625/v1/audio/transcriptions
       - -F
-      - file=@{{ service_account_home }}/build/flm/short.wav
+      - file=@/short.wav
       - -F
       - model=whisper-v3
   register: stt_check

@@ -1,0 +1,57 @@
+---
+# Open WebUI stores OPENAI_* and ENABLE_OLLAMA_API in its database on first start, so later changes go through its admin settings
+- name: Deploy Quadlet for Open WebUI
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: open-webui
+    image: "{{ webui_image }}"
+    network:
+      - llm.network
+    volume:
+      - open-webui-data:/app/backend/data
+    env:
+      OPENAI_API_BASE_URL: http://bifrost:8080/v1
+      OPENAI_API_KEY: none
+      ENABLE_OLLAMA_API: "False"
+      WEBUI_AUTH: "False" # Single shared user, enabling auth later requires wiping open-webui-data
+    state: quadlet
+    quadlet_options:
+      - |
+        [Unit]
+        Wants=bifrost.service
+        After=bifrost.service
+      - "{{ service_account_quadlet_options }}"
+  notify: Restart Open WebUI
+
+- name: Apply Pending Restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Start Open WebUI
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd_service:
+    name: open-webui.service
+    scope: user
+    daemon_reload: true
+    state: started
+
+# The first start downloads its embedding model, so allow a few minutes
+- name: Wait for Open WebUI
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - "{{ service_account_curl_image }}"
+      - -sf
+      - http://open-webui:8080/health
+  register: webui_health
+  changed_when: false
+  until: webui_health.rc == 0
+  retries: 30
+  delay: 10

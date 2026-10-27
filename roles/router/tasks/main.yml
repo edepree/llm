@@ -1,12 +1,4 @@
 ---
-# Rootless podman binds the host port as the service account
-- name: Allow Unprivileged Bind to Router Ports
-  ansible.posix.sysctl:
-    name: net.ipv4.ip_unprivileged_port_start
-    value: "{{ [router_port, router_webui_port] | min }}"
-    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
-  when: ([router_port, router_webui_port] | min) < 1024
-
 - name: Create Bifrost Config Directory
   ansible.builtin.file:
     path: "{{ service_account_home }}/.config/bifrost"
@@ -33,8 +25,6 @@
     image: "{{ router_bifrost_image }}"
     network:
       - llm.network
-    publish:
-      - "{{ router_port }}:8080/tcp"
     volume:
       - bifrost-data:/app/data
       - "{{ service_account_home }}/.config/bifrost/config.json:/app/data/config.json:ro"
@@ -50,76 +40,57 @@
   no_log: true # The env holds the admin password
   notify: Restart Bifrost
 
-# Open WebUI stores OPENAI_* and ENABLE_OLLAMA_API in its database on first start, so later changes go through its admin settings
-- name: Deploy Quadlet for Open WebUI
-  become: true
-  become_user: "{{ service_account_user }}"
-  containers.podman.podman_container:
-    name: open-webui
-    image: "{{ router_webui_image }}"
-    network:
-      - llm.network
-    publish:
-      - "{{ router_webui_port }}:8080/tcp"
-    volume:
-      - open-webui-data:/app/backend/data
-    env:
-      OPENAI_API_BASE_URL: http://bifrost:8080/v1
-      OPENAI_API_KEY: none
-      ENABLE_OLLAMA_API: "False"
-      WEBUI_AUTH: "False" # Single shared user, enabling auth later requires wiping open-webui-data
-    state: quadlet
-    quadlet_options:
-      - |
-        [Unit]
-        Wants=bifrost.service
-        After=bifrost.service
-      - "{{ service_account_quadlet_options }}"
-  notify: Restart Open WebUI
-
-- name: Allow Router Ports
-  community.general.ufw:
-    rule: allow
-    port: "{{ item | string }}"
-    proto: tcp
-  loop:
-    - "{{ router_port }}"
-    - "{{ router_webui_port }}"
-
 - name: Apply Pending Restarts
   ansible.builtin.meta: flush_handlers
 
-- name: Start Router Services
+- name: Start Bifrost
   become: true
   become_user: "{{ service_account_user }}"
   ansible.builtin.systemd_service:
-    name: "{{ item }}"
+    name: bifrost.service
     scope: user
     daemon_reload: true
     state: started
-  loop:
-    - bifrost.service
-    - open-webui.service
 
 - name: Wait for Router
-  ansible.builtin.uri:
-    url: http://127.0.0.1:{{ router_port }}/v1/models
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - "{{ service_account_curl_image }}"
+      - -sf
+      - http://bifrost:8080/v1/models
   register: router_models
+  changed_when: false
   until: >-
-    router_models.status == 200
-    and router_models.json.data | selectattr('id', 'match', 'llamacpp/') | list | length > 0
-    and router_models.json.data | selectattr('id', 'match', 'flm/') | list | length == 0
+    router_models.rc == 0
+    and (router_models.stdout | from_json).data | selectattr('id', 'match', 'llamacpp/') | list | length > 0
+    and (router_models.stdout | from_json).data | selectattr('id', 'match', 'flm/') | list | length == 0
   retries: 30
   delay: 10
 
 - name: Verify STT via Router
+  become: true
+  become_user: "{{ service_account_user }}"
   ansible.builtin.command:
     argv:
-      - curl
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - -v
+      - "{{ service_account_home }}/build/flm/short.wav:/short.wav:ro"
+      - "{{ service_account_curl_image }}"
       - -sf
-      - http://127.0.0.1:{{ router_port }}/v1/audio/transcriptions
+      - http://bifrost:8080/v1/audio/transcriptions
       - -F
-      - file=@{{ service_account_home }}/build/flm/short.wav
+      - file=@/short.wav
       - -F
       - model=flm/whisper-v3
       # The fields Home Assistant's OpenAI integration adds
@@ -135,15 +106,22 @@
 
 # Bifrost labels every speech response audio/mpeg whatever the format, so check the size of the audio instead
 - name: Verify TTS via Router
+  become: true
+  become_user: "{{ service_account_user }}"
   ansible.builtin.command:
     argv:
-      - curl
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - "{{ service_account_curl_image }}"
       - -sf
       - -o
       - /dev/null
       - -w
       - "%{size_download}"
-      - http://127.0.0.1:{{ router_port }}/v1/audio/speech
+      - http://bifrost:8080/v1/audio/speech
       - -H
       - "Content-Type: application/json"
       - -d
@@ -151,12 +129,3 @@
   register: router_tts
   changed_when: false
   failed_when: router_tts.rc != 0 or router_tts.stdout | int < 10000
-
-# The first start downloads its embedding model, so allow a few minutes
-- name: Wait for Open WebUI
-  ansible.builtin.uri:
-    url: http://127.0.0.1:{{ router_webui_port }}/health
-  register: router_webui
-  until: router_webui.status == 200
-  retries: 30
-  delay: 10

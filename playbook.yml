@@ -28,3 +28,9 @@
 
     - role: router
       tags: [router]
+
+    - role: webui
+      tags: [webui]
+
+    - role: proxy
+      tags: [proxy]

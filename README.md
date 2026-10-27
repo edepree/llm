@@ -2,13 +2,14 @@
 
 A local LLM inference server for AMD Strix Halo (Ryzen AI Max, `gfx1151`), deployed via Ansible on **Ubuntu 26.04 x86_64**. Other distributions, releases, and architectures are not supported.
 
-The playbook runs five rootless Podman Quadlet user services:
+The playbook runs six rootless Podman Quadlet user services:
 
 - `llamacpp-server`: llama.cpp `llama-server` built on the target with ROCm 10.0 for `gfx1151`, on the GPU
 - `flm-asr`: [FastFlowLM](https://github.com/ROCm/FastFlowLM) Whisper-V3-Turbo speech-to-text on the XDNA 2 NPU
 - `kokoro-tts`: [Kokoros](https://github.com/lucasjinreal/Kokoros) Kokoro-82M text-to-speech on the CPU, built on the target
 - `bifrost`: [Bifrost](https://github.com/maximhq/bifrost) gateway, the single OpenAI-compatible endpoint for the three backends
 - `open-webui`: [Open WebUI](https://github.com/open-webui/open-webui) chat front end that talks to Bifrost
+- `caddy`: [Caddy](https://caddyserver.com) reverse proxy on port 80, the LAN entry point for Bifrost and Open WebUI
 
 ROCm and XRT are only in the images. The host needs the kernel drivers and firmware, the TTM memory limit, Podman, and unlimited locked memory for the service account (the `service_account` role sets it).
 
@@ -43,17 +44,24 @@ cat /sys/module/ttm/parameters/pages_limit   # equals common_ttm_pages_limit
 | Service | Port | Description |
 |---------|------|-------------|
 | SSH | 22 | Remote access |
-| Bifrost | 80 | OpenAI-compatible API (`/v1`) + Bifrost dashboard (`/`) |
-| Open WebUI | 80 | Chat in the browser, through Bifrost |
-| llama-server | 127.0.0.1:8081 | Backend; API and built-in Web UI on the host only |
-| flm-asr | 127.0.0.1:52625 | Backend; speech-to-text on the host only |
-| kokoro-tts | 127.0.0.1:3000 | Backend; text-to-speech on the host only |
+| Caddy | 80 | Entry point: `chat.home.arpa` goes to Open WebUI; `router.home.arpa`, any other host and the IP go to Bifrost |
+| Bifrost | `bifrost:8080` | OpenAI-compatible API (`/v1`) + Bifrost dashboard (`/`), on the LAN through Caddy |
+| Open WebUI | `open-webui:8080` | Chat in the browser, through Bifrost; on the LAN through Caddy |
+| llama-server | `llamacpp-server:8080` | Backend; API and built-in Web UI |
+| flm-asr | `flm-asr:52625` | Backend; speech-to-text |
+| kokoro-tts | `kokoro-tts:3000` | Backend; text-to-speech |
 
-The API is at `http://<target>:8080/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`), `flm/whisper-v3` for `/v1/audio/transcriptions`, and `kokoro/kokoro` for `/v1/audio/speech`. To list them, run `curl http://<target>:8080/v1/models`. FastFlowLM's and Kokoros' models are left out of the list, since FastFlowLM lists only its chat models and Kokoros a fixed list of OpenAI names. Both still work when called by name.
+Only Caddy publishes a host port. The others listen on their default ports on `llm.network` only. To call one directly, run curl on that network as the service account (in `sudo machinectl shell llm@`):
 
 ```bash
-curl http://<target>:8080/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 -F language=en
-curl http://<target>:8080/v1/audio/speech -H 'Content-Type: application/json' -o reply.wav \
+podman run --rm --network llm docker.io/curlimages/curl:8.16.0 -s http://llamacpp-server:8080/health
+```
+
+The API is at `http://<target>/v1`. Model IDs carry the Bifrost provider name: `llamacpp/<preset>` for chat (for example `llamacpp/unsloth/Qwen3.6-35B-A3B-MTP-GGUF:UD-Q8_K_XL`), `flm/whisper-v3` for `/v1/audio/transcriptions`, and `kokoro/kokoro` for `/v1/audio/speech`. To list them, run `curl http://<target>/v1/models`. FastFlowLM's and Kokoros' models are left out of the list, since FastFlowLM lists only its chat models and Kokoros a fixed list of OpenAI names. Both still work when called by name.
+
+```bash
+curl http://<target>/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 -F language=en
+curl http://<target>/v1/audio/speech -H 'Content-Type: application/json' -o reply.wav \
   -d '{"model": "kokoro/kokoro", "input": "The lights are off.", "voice": "af_heart", "response_format": "wav"}'
 ```
 
@@ -65,11 +73,11 @@ Long audio is limited by upload size first: Bifrost accepts at most 100 MB per r
 
 At most `inference_models_max` models are loaded at once (default `1`). A request for another model unloads the least recently used idle model. The API has no key, so use it only on a trusted network.
 
-The Bifrost dashboard at `http://<target>:8080/` shows request logs. Log in as `admin` with the password in `credentials/bifrost-admin` on the machine that ran the playbook (generated on the first run, gitignored).
+The Bifrost dashboard at `http://<target>/` shows request logs. Log in as `admin` with the password in `credentials/bifrost-admin` on the machine that ran the playbook (generated on the first run, gitignored).
 
 ### Open WebUI
 
-Open the chat at `http://<target>`. It has no login: everyone on the network shares one user and its chat history, kept in the volume `open-webui-data`. Turning login on later requires deleting that volume. Its chats go through Bifrost, so they appear in the Bifrost logs. The connection to Bifrost is stored in its database on first start; change it later under Admin Settings → Connections.
+Open the chat at `http://chat.home.arpa` (`proxy_webui_host`). Point DNS records for `chat.home.arpa` and `router.home.arpa` at the target; Caddy sends `router.home.arpa`, every other name and the bare IP to Bifrost. HTTP only, no TLS yet. It has no login: everyone on the network shares one user and its chat history, kept in the volume `open-webui-data`. Turning login on later requires deleting that volume. Its chats go through Bifrost, so they appear in the Bifrost logs. The connection to Bifrost is stored in its database on first start; change it later under Admin Settings → Connections.
 
 ### Home Assistant
 
@@ -80,7 +88,7 @@ Home Assistant uses its built-in **OpenAI** integration for speech-to-text and t
    ```yaml
    env:
      - name: OPENAI_BASE_URL
-       value: "http://<target>:8080/v1"
+       value: "http://<target>/v1"
    ```
 
 2. Under Settings → Devices & services, add the **OpenAI** integration. Enter any API key: Bifrost ignores it, but the field is required.
@@ -93,7 +101,7 @@ The variable applies to the whole Home Assistant process: every OpenAI-based int
 A short command takes about 2 s to transcribe: Whisper always processes a 30 s window. Requests are handled one at a time. To send the same request Home Assistant sends:
 
 ```bash
-curl http://<target>:8080/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 \
+curl http://<target>/v1/audio/transcriptions -F file=@clip.wav -F model=flm/whisper-v3 \
   -F language=en -F response_format=json -F prompt="Home Assistant voice command"
 ```
 
@@ -122,9 +130,11 @@ podman images localhost/llama-server
 
 ```mermaid
 flowchart LR
-    CLIENT["API client"] --> BIFROST["bifrost\nport 8080"]
-    HA["Home Assistant"] --> BIFROST
-    BROWSER["Browser"] --> WEBUI["open-webui\nport 80 → 8080"]
+    CLIENT["API client"] --> CADDY["caddy\nport 80"]
+    HA["Home Assistant"] --> CADDY
+    BROWSER["Browser"] --> CADDY
+    CADDY -->|"any other host / IP"| BIFROST["bifrost\n:8080"]
+    CADDY -->|"proxy_webui_host"| WEBUI["open-webui\n:8080"]
     WEBUI --> BIFROST
     BIFROST --> LLAMA["llamacpp-server\n:8080"]
     BIFROST --> FLM["flm-asr\n:52625"]
@@ -194,7 +204,9 @@ sudo reboot
 | `inference` | `inference` | llama-server image build, GPU check, preset file, Quadlet, health check |
 | `stt` | `stt` | FastFlowLM image build, NPU check, Quadlet, transcription check |
 | `tts` | `tts` | Kokoros image build, Quadlet, speech check |
-| `router` | `router` | Bifrost config and Quadlet, Open WebUI Quadlet, unprivileged port, firewall, end-to-end checks. Needs `inference`, `stt` and `tts` deployed first |
+| `router` | `router` | Bifrost config and Quadlet, model, STT and TTS checks. Needs `inference`, `stt` and `tts` deployed first |
+| `webui` | `webui` | Open WebUI Quadlet, health check |
+| `proxy` | `proxy` | Caddy config and Quadlet, unprivileged port 80, firewall, checks of both routes. Needs `router` and `webui` deployed first |
 
 ## Configuration
 
@@ -228,13 +240,14 @@ Keys are llama.cpp CLI arguments without leading dashes (see the [model presets 
 | `inference_models_max` | `1` | Models loaded at once |
 | `stt_flm_version` | `1.0.10` | FastFlowLM release built into the image |
 | `tts_kokoros_ref` | `dda39518…` | Kokoros commit built into the image |
-| `router_port` | `8080` | Host port for Bifrost |
 | `router_bifrost_image` | `docker.io/maximhq/bifrost:v2.3.2` | Bifrost image |
-| `router_webui_port` | `80` | Host port for Open WebUI |
-| `router_webui_image` | `ghcr.io/open-webui/open-webui:v0.12.3` | Open WebUI image |
 | `router_stt_timeout` | `300` | Seconds Bifrost waits for a transcription |
 | `router_tts_timeout` | `60` | Seconds Bifrost waits for speech |
 | `router_chat_timeout` | `900` | Seconds Bifrost waits for a non-streaming chat or completion |
+| `webui_image` | `ghcr.io/open-webui/open-webui:v0.12.3` | Open WebUI image |
+| `proxy_caddy_image` | `docker.io/library/caddy:2.10.2` | Caddy image |
+| `proxy_webui_host` | `chat.home.arpa` | Hostname Caddy routes to Open WebUI |
+| `proxy_router_host` | `router.home.arpa` | Hostname Caddy routes to Bifrost, which also gets any other host and the IP |
 | `service_account_user` | `llm` | Account that owns and runs the services |
 | `common_kernel_packages` | kernel metapackages | Held against upgrades with `linux-firmware`, if installed |
 | `common_ttm_pages_limit` | `29360128` | TTM pages limit (GPU-addressable system memory) |

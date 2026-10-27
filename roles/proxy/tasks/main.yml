@@ -1,0 +1,90 @@
+---
+# Rootless podman binds the host port as the service account
+- name: Allow Unprivileged Bind to Port 80
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_unprivileged_port_start
+    value: "80"
+    sysctl_file: /etc/sysctl.d/99-unprivileged-ports.conf
+
+- name: Create Caddy Config Directory
+  ansible.builtin.file:
+    path: "{{ service_account_home }}/.config/caddy"
+    state: directory
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0755"
+
+- name: Deploy Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ service_account_home }}/.config/caddy/Caddyfile"
+    owner: "{{ service_account_user }}"
+    group: "{{ service_account_user }}"
+    mode: "0644"
+  notify: Restart Caddy
+
+# The only container with a host port, it routes by Host header to Bifrost and Open WebUI
+- name: Deploy Quadlet for Caddy
+  become: true
+  become_user: "{{ service_account_user }}"
+  containers.podman.podman_container:
+    name: caddy
+    image: "{{ proxy_caddy_image }}"
+    network:
+      - llm.network
+    publish:
+      - 80:80/tcp
+    volume:
+      - "{{ service_account_home }}/.config/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+    state: quadlet
+    quadlet_options:
+      - |
+        [Unit]
+        Wants=bifrost.service open-webui.service
+        After=bifrost.service open-webui.service
+      - "{{ service_account_quadlet_options }}"
+  notify: Restart Caddy
+
+- name: Allow HTTP
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+
+# Bifrost was published on 8080 before Caddy
+- name: Remove Old Bifrost Port Rule
+  community.general.ufw:
+    rule: allow
+    port: "8080"
+    proto: tcp
+    delete: true
+
+- name: Apply Pending Restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Start Caddy
+  become: true
+  become_user: "{{ service_account_user }}"
+  ansible.builtin.systemd_service:
+    name: caddy.service
+    scope: user
+    daemon_reload: true
+    state: started
+
+- name: Verify Proxy Routes to Bifrost
+  ansible.builtin.uri:
+    url: http://127.0.0.1/v1/models
+  register: proxy_bifrost
+  until: proxy_bifrost.status == 200 and proxy_bifrost.json.data is defined
+  retries: 10
+  delay: 3
+
+- name: Verify Proxy Routes to Open WebUI
+  ansible.builtin.uri:
+    url: http://127.0.0.1/health
+    headers:
+      Host: "{{ proxy_webui_host }}"
+  register: proxy_webui
+  until: proxy_webui.status == 200
+  retries: 10
+  delay: 3

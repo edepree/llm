@@ -40,8 +40,6 @@
     init: true
     network:
       - llm.network
-    publish:
-      - 127.0.0.1:3000:3000/tcp
     command: --instances 1 openai
     state: quadlet
     quadlet_options:
@@ -62,15 +60,22 @@
 
 # kokoros has no health endpoint, so synthesize a phrase
 - name: Wait for TTS
+  become: true
+  become_user: "{{ service_account_user }}"
   ansible.builtin.command:
     argv:
-      - curl
+      - podman
+      - run
+      - --rm
+      - --network
+      - llm
+      - "{{ service_account_curl_image }}"
       - -sf
       - -o
       - /dev/null
       - -w
       - "%{content_type}"
-      - http://127.0.0.1:3000/v1/audio/speech
+      - http://kokoro-tts:3000/v1/audio/speech
       - -H
       - "Content-Type: application/json"
       - -d
