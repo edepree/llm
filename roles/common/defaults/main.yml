@@ -1,7 +1,6 @@
 ---
 common_packages:
   - acl
-  - curl # multipart uploads in the STT checks
   - libxrt-utils-npu # xrt-smi for NPU status and firmware version
   - nethogs # per-process network traffic, e.g. model downloads
   - nvtop

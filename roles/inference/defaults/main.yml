@@ -4,7 +4,9 @@ inference_models_max: 1
 # ROCm 10.0 and gfx1151 are set in files/Containerfile, so update this tag with them
 inference_image: "localhost/llama-server:{{ inference_llama_ref }}-rocm10.0"
 
-# "*" applies to every model
+# Each key is a models-preset.ini section and model ID; "*" applies to every model. Settings are llama-server
+# arguments without leading dashes, see https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#model-presets
+# load-on-startup: true on one preset loads it when the server starts
 inference_presets:
   "*":
     cache-ram: 4096 # MiB of host RAM for the prompt (KV prefix) cache
